@@ -393,8 +393,7 @@ function Wizard() {
   );
 }
 
-export default Wizard;;
-      case 'childName':
+export default Wizard;
         return !!form.childName;
       case 'age':
         return !!form.age;
