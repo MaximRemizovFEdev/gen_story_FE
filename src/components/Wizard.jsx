@@ -143,7 +143,10 @@ function Wizard() {
         </div>
         {coverUrl && (
           <div className="cover-preview">
-            <img src={coverUrl} alt="Обложка" style={{ maxWidth: '100%', marginTop: '20px' }} />
+                            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                              <img src={coverUrl} alt="Обложка" style={{ maxWidth: '100%' }} />
+                              <p style={{ textAlign: 'center', marginTop: '10px' }}>Скачать книгу</p>
+                            </a>
           </div>
         )}
         {pdfUrl && (
