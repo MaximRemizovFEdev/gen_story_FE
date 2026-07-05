@@ -73,15 +73,29 @@ function Wizard() {
 
   const handleSubmit = async () => {
     try {
-      console.log('Submitting form data:', form);
-      const response = await apiService.generateStory(form);
-      console.log('Story response:', response);
-      alert('Форма успешно отправлена! Генерация началась.');
+      // Генерация сценария
+      const storyResponse = await apiService.generateStory(form);
+      console.log('Сценарий сгенерирован:', storyResponse);
+
+      // Генерация обложки
+      const coverResponse = await apiService.generateCover(form);
+      console.log('Обложка создана:', coverResponse);
+
+      // Генерация иллюстраций
+      const scenesResponse = await apiService.generateScenes(form);
+      console.log('Иллюстрации сгенерированы:', scenesResponse);
+
+      // Создание книги
+      const bookResponse = await apiService.generateBook(form);
+      console.log('Книга готова:', bookResponse);
+
+      // Покажем финальный экран и книги
+      alert('Все шаги завершены! Книга готова.');
     } catch (error) {
-      console.error('Error submitting form:', error);
-      alert('Ошибка при отправке формы: ' + error.message);
+      console.error('Ошибка при генерации:', error);
+      alert('Ошибка: ' + error.message);
     }
-  };
+  };;
 
   const renderStepContent = () => {
     switch (current.field) {
