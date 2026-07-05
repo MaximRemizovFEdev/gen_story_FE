@@ -1,4 +1,5 @@
 import React from 'react';
+import apiService from '../services/ApiService';
 
 function Wizard() {
   const [step, setStep] = React.useState(1);
@@ -67,6 +68,18 @@ function Wizard() {
         return form.interests.length > 0 && form.interests.length <= 3;
       default:
         return false;
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      console.log('Submitting form data:', form);
+      const response = await apiService.generateStory(form);
+      console.log('Story response:', response);
+      alert('Форма успешно отправлена! Генерация началась.');
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      alert('Ошибка при отправке формы: ' + error.message);
     }
   };
 
@@ -257,7 +270,7 @@ function Wizard() {
           </button>
         )}
         {step === steps.length && (
-          <button onClick={() => alert('Форма готова к отправке!')} disabled={!isStepValid()}>
+          <button onClick={handleSubmit} disabled={!isStepValid()}>
             Создать книгу
           </button>
         )}
