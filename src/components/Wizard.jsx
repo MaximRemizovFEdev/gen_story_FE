@@ -19,6 +19,7 @@ function Wizard() {
   const [coverUrl, setCoverUrl] = React.useState(null);
   const [pdfUrl, setPdfUrl] = React.useState(null);
   const [error, setError] = React.useState(null);
+  const [failedStep, setFailedStep] = React.useState(null);
 
   const steps = [
     { label: 'Телефон', field: 'phone' },
@@ -56,6 +57,343 @@ function Wizard() {
     switch (current.field) {
       case 'phone':
         return !!form.phone;
+      case 'childName':
+        return !!form.childName;
+      case 'age':
+        return !!form.age;
+      case 'hero':
+        if (form.hero === 'Свой вариант') {
+          return !!form.heroCustom;
+        }
+        return !!form.hero;
+      case 'adventure':
+        if (form.adventure === 'Свой вариант') {
+          return !!form.adventureCustom;
+        }
+        return !!form.adventure;
+      case 'atmosphere':
+        return !!form.atmosphere;
+      case 'interests':
+        return form.interests.length > 0 && form.interests.length <= 3;
+      default:
+        return false;
+    }
+  };
+
+  const processStep = async (stepIndex) => {
+    try {
+      switch (stepIndex) {
+        case 0: {
+          const storyResp = await apiService.generateStory(form);
+          setCurrentGenStep(1);
+          await processStep(stepIndex + 1);
+          break;
+        }
+        case 1: {
+          const coverResp = await apiService.generateCover(form);
+          setCoverUrl(coverResp.url);
+          setCurrentGenStep(2);
+          await processStep(stepIndex + 1);
+          break;
+        }
+        case 2: {
+          await apiService.generateScenes(form);
+          setCurrentGenStep(3);
+          await processStep(stepIndex + 1);
+          break;
+        }
+        case 3: {
+          const bookResp = await apiService.generateBook(form);
+          setPdfUrl(bookResp.pdfUrl);
+          setCurrentGenStep(4);
+          setIsGenerating(false);
+          return;
+        }
+        default:
+          setIsGenerating(false);
+      }
+    } catch (err) {
+      setError(err.message);
+      setFailedStep(stepIndex);
+      setIsGenerating(false);
+    }
+  };
+
+  const retryFailedStep = async () => {
+    if (failedStep == null) return;
+    setError(null);
+    const savedStep = failedStep;
+    setFailedStep(null);
+    await processStep(savedStep);
+  };
+
+  const handleSubmit = async () => {
+    setIsGenerating(true);
+    setError(null);
+    setFailedStep(null);
+    processStep(0);
+  };
+
+  const renderGenProgress = () => {
+    if (error) {
+      return (
+        <div className="generation-error" style={{ color: 'orange', textAlign: 'center' }}>
+          <span style={{ fontSize: '2rem', color: 'orange' }}>⚠️</span>
+          <p style={{ color: 'orange' }}>Произошла ошибка. Попробуйте повторить шаг.</p>
+          <button
+            onClick={retryFailedStep}
+            style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              backgroundColor: '#ffeb3b',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Повторить
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="progress-screen">
+        <h2>Генерация книги</h2>
+        <div className="progress-steps">
+          {genSteps.map((label, idx) => (
+            <div
+              key={label}
+              className={`progress-step ${idx === currentGenStep ? 'active' : ''} ${idx < currentGenStep ? 'completed' : ''}`}
+              style={{
+                padding: '10px',
+                margin: '5px 0',
+                backgroundColor: idx === currentGenStep ? '#4CAF50' : idx < currentGenStep ? '#8BC34C' : '#f0f0f0',
+                borderRadius: '4px'
+              }}
+            >
+              Шаг {idx + 1}/4 — {label}
+            </div>
+          ))}
+        </div>
+        {coverUrl && (
+          <div className="cover-preview">
+            <img src={coverUrl} alt="Обложка" style={{ maxWidth: '100%', marginTop: '20px' }} />
+          </div>
+        )}
+        {pdfUrl && (
+          <div className="download-link">
+            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+              <img src={coverUrl} alt="Скачать книгу" style={{ maxWidth: '100%' }} />
+              <p style={{ textAlign: 'center', marginTop: '10px' }}>Скачать книгу</p>
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderStepContent = () => {
+    if (isGenerating) {
+      return renderGenProgress();
+    }
+
+    switch (current.field) {
+      case 'phone':
+        return (
+          <div>
+            <label>Телефон:</label>
+            <input
+              type="tel"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              maxLength="120"
+              required
+              placeholder="Введите телефон"
+            />
+          </div>
+        );
+      case 'childName':
+        return (
+          <div>
+            <label>Имя ребенка:</label>
+            <input
+              type="text"
+              name="childName"
+              value={form.childName}
+              onChange={handleChange}
+              maxLength="120"
+              placeholder="Введите имя"
+            />
+          </div>
+        );
+      case 'age':
+        return (
+          <div>
+            <label>Возраст:</label>
+            {ageOptions.map(option => (
+              <div key={option} style={{ marginBottom: '8px' }}>
+                <label>
+                  <input
+                    type="radio"
+                    name="age"
+                    value={option}
+                    checked={form.age === option}
+                    onChange={handleChange}
+                  />
+                  {option}
+                </label>
+              </div>
+            ))}
+          </div>
+        );
+      case 'hero':
+        return (
+          <div>
+            <label>Главный герой:</label>
+            {heroOptions.map(option => (
+              <div key={option} style={{ marginBottom: '8px' }}>
+                <label>
+                  <input
+                    type="radio"
+                    name="hero"
+                    value={option}
+                    checked={form.hero === option}
+                    onChange={handleChange}
+                  />
+                  {option}
+                </label>
+              </div>
+            ))}
+            {form.hero === 'Свой вариант' && (
+              <div>
+                <label>Ваш вариант героя:</label>
+                <input
+                  type="text"
+                  name="heroCustom"
+                  value={form.heroCustom}
+                  onChange={handleChange}
+                  maxLength="120"
+                  placeholder="Введите вариант"
+                />
+              </div>
+            )}
+          </div>
+        );
+      case 'adventure':
+        return (
+          <div>
+            <label>Приключение:</label>
+            {adventureOptions.map(option => (
+              <div key={option} style={{ marginBottom: '8px' }}>
+                <label>
+                  <input
+                    type="radio"
+                    name="adventure"
+                    value={option}
+                    checked={form.adventure === option}
+                    onChange={handleChange}
+                  />
+                  {option}
+                </label>
+              </div>
+            ))}
+            {form.adventure === 'Свой вариант' && (
+              <div>
+                <label>Ваш вариант приключения:</label>
+                <input
+                  type="text"
+                  name="adventureCustom"
+                  value={form.adventureCustom}
+                  onChange={handleChange}
+                  maxLength="120"
+                  placeholder="Введите вариант"
+                />
+              </div>
+            )}
+          </div>
+        );
+      case 'atmosphere':
+        return (
+          <div>
+            <label>Атмосфера сказки:</label>
+            {atmosphereOptions.map(option => (
+              <div key={option} style={{ marginBottom: '8px' }}>
+                <label>
+                  <input
+                    type="radio"
+                    name="atmosphere"
+                    value={option}
+                    checked={form.atmosphere === option}
+                    onChange={handleChange}
+                  />
+                  {option}
+                </label>
+              </div>
+            ))}
+          </div>
+        );
+      case 'interests':
+        return (
+          <div>
+            <label>Интересы (максимум 3):</label>
+            {interestsOptions.map(option => (
+              <div key={option} style={{ marginBottom: '8px' }}>
+                <label>
+                  <input
+                    type="checkbox"
+                    name="interests"
+                    value={option}
+                    checked={form.interests.includes(option)}
+                    onChange={handleChange}
+                  />
+                  {option}
+                </label>
+              </div>
+            ))}
+            {form.interests.length > 3 && (
+              <p style={{ color: 'red' }}>Можно выбрать не более 3 интересов</p>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="wizard">
+      <h1>Story Generator Wizard</h1>
+      <p>Заполните анкету, чтобы создать свою книгу.</p>
+      <div className="step-indicator">
+        Шаг {step} из {steps.length}
+      </div>
+      <div className="step-content">
+        {renderStepContent()}
+      </div>
+      <div className="buttons">
+        {step > 1 && !isGenerating && (
+          <button onClick={() => setStep(step - 1)} disabled={!isStepValid()}>
+            Назад
+          </button>
+        )}
+        {step < steps.length && !isGenerating && (
+          <button onClick={() => setStep(step + 1)} disabled={!isStepValid()}>
+            Далее
+          </button>
+        )}
+        {step === steps.length && !isGenerating && (
+          <button onClick={handleSubmit} disabled={!isStepValid()}>
+            Создать книгу
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Wizard;;
       case 'childName':
         return !!form.childName;
       case 'age':
