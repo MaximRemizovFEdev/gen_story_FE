@@ -14,6 +14,12 @@ function Wizard() {
     atmosphere: '',
     interests: []
   });
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [currentGenStep, setCurrentGenStep] = React.useState(0);
+  const [coverUrl, setCoverUrl] = React.useState(null);
+  const [pdfUrl, setPdfUrl] = React.useState(null);
+  const [error, setError] = React.useState(null);
+
   const steps = [
     { label: 'Телефон', field: 'phone' },
     { label: 'Имя ребенка', field: 'childName' },
@@ -23,7 +29,9 @@ function Wizard() {
     { label: 'Атмосфера сказки', field: 'atmosphere' },
     { label: 'Интересы', field: 'interests' },
   ];
-  const current = steps[step-1];
+  const genSteps = ['Создаем сценарий', 'Рисуем обложку', 'Генерируем иллюстрации', 'Собираем книгу'];
+
+  const current = steps[step - 1];
 
   const ageOptions = ['1–3 года', '3–4 года', '5–6 лет', '7–8 лет'];
   const heroOptions = ['Сам ребенок', 'Котик', 'Медвежонок', 'Дракончик', 'Единорог', 'Супергерой', 'Свой вариант'];
@@ -72,32 +80,89 @@ function Wizard() {
   };
 
   const handleSubmit = async () => {
+    setIsGenerating(true);
+    setError(null);
+    setCoverUrl(null);
+    setPdfUrl(null);
+    setCurrentGenStep(0);
+
     try {
-      // Генерация сценария
+      // Шаг 1: Создаем сценарий
       const storyResponse = await apiService.generateStory(form);
       console.log('Сценарий сгенерирован:', storyResponse);
+      setCurrentGenStep(1);
 
-      // Генерация обложки
+      // Шаг 2: Рисуем обложку
       const coverResponse = await apiService.generateCover(form);
-      console.log('Обложка создана:', coverResponse);
+      setCoverUrl(coverResponse.url);
+      setCurrentGenStep(2);
 
-      // Генерация иллюстраций
-      const scenesResponse = await apiService.generateScenes(form);
-      console.log('Иллюстрации сгенерированы:', scenesResponse);
+      // Шаг 3: Генерируем иллюстрации
+      await apiService.generateScenes(form);
+      setCurrentGenStep(3);
 
-      // Создание книги
+      // Шаг 4: Собираем книгу
       const bookResponse = await apiService.generateBook(form);
-      console.log('Книга готова:', bookResponse);
-
-      // Покажем финальный экран и книги
-      alert('Все шаги завершены! Книга готова.');
-    } catch (error) {
-      console.error('Ошибка при генерации:', error);
-      alert('Ошибка: ' + error.message);
+      setPdfUrl(bookResponse.pdfUrl);
+      setCurrentGenStep(4);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsGenerating(false);
     }
-  };;
+  };
+
+  const renderGenProgress = () => {
+    if (error) {
+      return (
+        <div className="generation-error">
+          <span style={{ color: 'orange', fontSize: '2rem' }}>⚠️</span>
+          <p style={{ color: 'orange' }}>Произошла ошибка. Попробуйте повторить шаг.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="progress-screen">
+        <h2>Генерация книги</h2>
+        <div className="progress-steps">
+          {genSteps.map((label, idx) => (
+            <div
+              key={label}
+              className={`progress-step ${idx === currentGenStep ? 'active' : ''} ${idx < currentGenStep ? 'completed' : ''}`}
+              style={{
+                padding: '10px',
+                margin: '5px 0',
+                backgroundColor: idx === currentGenStep ? '#4CAF50' : idx < currentGenStep ? '#8BC34C' : '#f0f0f0',
+                borderRadius: '4px'
+              }}
+            >
+              Шаг {idx + 1}/4 — {label}
+            </div>
+          ))}
+        </div>
+        {coverUrl && (
+          <div className="cover-preview">
+            <img src={coverUrl} alt="Обложка" style={{ maxWidth: '100%', marginTop: '20px' }} />
+          </div>
+        )}
+        {pdfUrl && (
+          <div className="download-link">
+            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+              <img src={coverUrl} alt="Скачать книгу" style={{ maxWidth: '100%', cursor: 'pointer' }} />
+              <p style={{ textAlign: 'center', marginTop: '10px' }}>Скачать книгу</p>
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderStepContent = () => {
+    if (isGenerating) {
+      return renderGenProgress();
+    }
+
     switch (current.field) {
       case 'phone':
         return (
@@ -273,17 +338,17 @@ function Wizard() {
         {renderStepContent()}
       </div>
       <div className="buttons">
-        {step > 1 && (
+        {step > 1 && !isGenerating && (
           <button onClick={() => setStep(step - 1)} disabled={!isStepValid()}>
             Назад
           </button>
         )}
-        {step < steps.length && (
+        {step < steps.length && !isGenerating && (
           <button onClick={() => setStep(step + 1)} disabled={!isStepValid()}>
             Далее
           </button>
         )}
-        {step === steps.length && (
+        {step === steps.length && !isGenerating && (
           <button onClick={handleSubmit} disabled={!isStepValid()}>
             Создать книгу
           </button>
