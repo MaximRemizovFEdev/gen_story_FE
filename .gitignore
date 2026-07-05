@@ -1,0 +1,27 @@
+# Node modules
+node_modules/
+
+# Build outputs
+build/
+dist/
+out/
+
+#をlogs
+yarnand npm logs
+*.log*
+
+# Environment
+.env
+.env.
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# package lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
