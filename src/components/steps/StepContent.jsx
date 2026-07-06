@@ -36,7 +36,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           label="Возраст"
           name="age"
           value={form.age}
-          onHandleChange={handleChange}
+          onChange={handleChange}
           options={ageOptions}
         />
       );
@@ -47,7 +47,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
             label="Главный герой"
             name="hero"
             value={form.hero}
-            onHandleChange={handleChange}
+            onChange={handleChange}
             options={heroOptions}
           />
           {form.hero === 'Свой вариант' && (
@@ -69,7 +69,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
             label="Приключение"
             name="adventure"
             value={form.adventure}
-            onHandleChange={handleChange}
+            onChange={handleChange}
             options={adventureOptions}
           />
           {form.adventure === 'Свой вариант' && (
@@ -90,7 +90,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           label="Атмосфера сказки"
           name="atmosphere"
           value={form.atmosphere}
-          onHandleChange={handleChange}
+          onChange={handleChange}
           options={atmosphereOptions}
         />
       );
@@ -100,7 +100,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           label="Интересы (максимум 3)"
           name="interests"
           value={form.interests}
-          onHandleChange={handleChange}
+          onChange={handleChange}
           options={interestsOptions}
           max={3}
         />

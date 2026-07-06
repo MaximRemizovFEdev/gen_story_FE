@@ -1,6 +1,12 @@
 class ApiService {
+  constructor() {
+    // Берем URL из переменных окружения или используем пустую строку (относительный путь)
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    console.log('API Base URL:', this.baseUrl); // 👈 для отладки
+  }
+
   async generateStory(formData) {
-    const response = await fetch('/api/generate-story', {
+    const response = await fetch(`${this.baseUrl}/api/generate-story`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
@@ -12,7 +18,7 @@ class ApiService {
   }
 
   async generateCover(formData) {
-    const response = await fetch('/api/generate-cover', {
+    const response = await fetch(`${this.baseUrl}/api/generate-cover`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
@@ -24,7 +30,7 @@ class ApiService {
   }
 
   async generateScenes(formData) {
-    const response = await fetch('/api/generate-scenes', {
+    const response = await fetch(`${this.baseUrl}/api/generate-scenes`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
@@ -36,7 +42,7 @@ class ApiService {
   }
 
   async generateBook(formData) {
-    const response = await fetch('/api/generate-book', {
+    const response = await fetch(`${this.baseUrl}/api/generate-book`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
