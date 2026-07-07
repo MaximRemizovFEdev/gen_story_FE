@@ -1,12 +1,12 @@
 export interface FormDataType {
   phone: string;
   childName: string;
-  age: string;
-  hero: string;
+  ageGroup: string;
+  heroType: string;
   heroCustom: string;
-  adventure: string;
+  adventureGoal: string;
   adventureCustom: string;
-  atmosphere: string;
+  storyMood: string;
   interests: string[];
 }
 

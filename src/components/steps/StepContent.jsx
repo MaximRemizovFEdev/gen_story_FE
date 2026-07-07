@@ -30,27 +30,27 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           placeholder="Введите имя"
         />
       );
-    case 'age':
+    case 'ageGroup':
       return (
         <RadioGroup
           label="Возраст"
-          name="age"
-          value={form.age}
+          name="ageGroup"
+          value={form.ageGroup}
           onChange={handleChange}
           options={ageOptions}
         />
       );
-    case 'hero':
+    case 'heroType':
       return (
         <>
           <RadioGroup
             label="Главный герой"
-            name="hero"
-            value={form.hero}
+            name="heroType"
+            value={form.heroType}
             onChange={handleChange}
             options={heroOptions}
           />
-          {form.hero === 'Свой вариант' && (
+          {form.heroType === 'Свой вариант' && (
             <TextInput
               label="Ваш вариант героя"
               name="heroCustom"
@@ -62,17 +62,17 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           )}
         </>
       );
-    case 'adventure':
+    case 'adventureGoal':
       return (
         <>
           <RadioGroup
             label="Приключение"
-            name="adventure"
-            value={form.adventure}
+            name="adventureGoal"
+            value={form.adventureGoal}
             onChange={handleChange}
             options={adventureOptions}
           />
-          {form.adventure === 'Свой вариант' && (
+          {form.adventureGoal === 'Свой вариант' && (
             <TextInput
               label="Ваш вариант приключения"
               name="adventureCustom"
@@ -84,12 +84,12 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           )}
         </>
       );
-    case 'atmosphere':
+    case 'storyMood':
       return (
         <RadioGroup
           label="Атмосфера сказки"
-          name="atmosphere"
-          value={form.atmosphere}
+          name="storyMood"
+          value={form.storyMood}
           onChange={handleChange}
           options={atmosphereOptions}
         />

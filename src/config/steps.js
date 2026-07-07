@@ -2,10 +2,10 @@
 export const steps = [
   { label: 'Телефон', field: 'phone' },
   { label: 'Имя ребенка', field: 'childName' },
-  { label: 'Возраст', field: 'age' },
-  { label: 'Главный герой', field: 'hero' },
-  { label: 'Приключение', field: 'adventure' },
-  { label: 'Атмосфера сказки', field: 'atmosphere' },
+  { label: 'Возраст', field: 'ageGroup' },
+  { label: 'Главный герой', field: 'heroType' },
+  { label: 'Приключение', field: 'adventureGoal' },
+  { label: 'Атмосфера сказки', field: 'storyMood' },
   { label: 'Интересы', field: 'interests' },
 ];
 

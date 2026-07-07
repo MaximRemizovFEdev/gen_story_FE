@@ -6,12 +6,12 @@ export const useWizardForm = () => {
   const [form, setForm] = useState({
     phone: "",
     childName: "",
-    age: "",
-    hero: "",
+    ageGroup: "",
+    heroType: "",
     heroCustom: "",
-    adventure: "",
+    adventureGoal: "",
     adventureCustom: "",
-    atmosphere: "",
+    storyMood: "",
     interests: [],
   });
 
@@ -39,20 +39,20 @@ export const useWizardForm = () => {
         return !!form.phone;
       case "childName":
         return !!form.childName;
-      case "age":
-        return !!form.age;
-      case "hero":
-        if (form.hero === "Свой вариант") {
+      case "ageGroup":
+        return !!form.ageGroup;
+      case "heroType":
+        if (form.heroType === "Свой вариант") {
           return !!form.heroCustom;
         }
-        return !!form.hero;
-      case "adventure":
-        if (form.adventure === "Свой вариант") {
+        return !!form.heroType;
+      case "adventureGoal":
+        if (form.adventureGoal === "Свой вариант") {
           return !!form.adventureCustom;
         }
-        return !!form.adventure;
-      case "atmosphere":
-        return !!form.atmosphere;
+        return !!form.adventureGoal;
+      case "storyMood":
+        return !!form.storyMood;
       case "interests":
         return (
           Array.isArray(form.interests) &&
@@ -77,12 +77,12 @@ export const useWizardForm = () => {
     setForm({
       phone: "",
       childName: "",
-      age: "",
-      hero: "",
+      ageGroup: "",
+      heroType: "",
       heroCustom: "",
-      adventure: "",
+      adventureGoal: "",
       adventureCustom: "",
-      atmosphere: "",
+      storyMood: "",
       interests: [],
     });
   }, []);

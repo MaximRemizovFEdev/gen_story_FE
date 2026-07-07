@@ -6,7 +6,7 @@ class ApiService {
   }
 
   async generateStory(formData) {
-    const response = await fetch(`${this.baseUrl}/api/generate-story`, {
+    const response = await fetch(`${this.baseUrl}/generate-story`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
@@ -18,7 +18,7 @@ class ApiService {
   }
 
   async generateCover(formData) {
-    const response = await fetch(`${this.baseUrl}/api/generate-cover`, {
+    const response = await fetch(`${this.baseUrl}/generate-cover`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
@@ -30,7 +30,7 @@ class ApiService {
   }
 
   async generateScenes(formData) {
-    const response = await fetch(`${this.baseUrl}/api/generate-scenes`, {
+    const response = await fetch(`${this.baseUrl}/generate-scenes`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
@@ -42,7 +42,7 @@ class ApiService {
   }
 
   async generateBook(formData) {
-    const response = await fetch(`${this.baseUrl}/api/generate-book`, {
+    const response = await fetch(`${this.baseUrl}/generate-book`, {
       method: 'POST',
       body: JSON.stringify(formData),
       headers: {
