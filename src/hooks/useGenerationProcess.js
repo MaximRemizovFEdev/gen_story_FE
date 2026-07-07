@@ -27,24 +27,30 @@ export const useGenerationProcess = () => {
     try {
       // Шаг 1: Генерация сюжета
       console.log('📝 Шаг 1: Генерация сюжета...');
-      await apiService.generateStory(form);
+      const responseStory = await apiService.generateStory(form);
       setCurrentGenStep(1);
 
       // Шаг 2: Генерация обложки
       console.log('🎨 Шаг 2: Генерация обложки...');
-      const coverResp = await apiService.generateCover(form);
-      setCoverUrl(coverResp.url);
+      const coverResp = await apiService.generateCover({
+        ...responseStory
+      });
+      setCoverUrl(coverResp.coverPath);
       setCurrentGenStep(2);
 
       // Шаг 3: Генерация сцен
       console.log('🖼️ Шаг 3: Генерация сцен...');
-      await apiService.generateScenes(form);
+      await apiService.generateScenes({
+        ...responseStory
+      });
       setCurrentGenStep(3);
 
       // Шаг 4: Сборка книги
       console.log('📚 Шаг 4: Сборка книги...');
-      const bookResp = await apiService.generateBook(form);
-      setPdfUrl(bookResp.pdfUrl);
+      const bookResp = await apiService.generateBook({
+        ...responseStory
+      });
+      setPdfUrl(bookResp.pdfPath);
       setCurrentGenStep(4);
 
       console.log('✅ Генерация завершена!');
