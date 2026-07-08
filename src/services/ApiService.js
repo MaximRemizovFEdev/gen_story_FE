@@ -1,7 +1,7 @@
 class ApiService {
   constructor() {
     // Берем URL из переменных окружения или используем пустую строку (относительный путь)
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     console.log('API Base URL:', this.baseUrl); // 👈 для отладки
   }
 

@@ -3,7 +3,7 @@ import Wizard from '../components/Wizard';
 
 function HomePage() {
   return (
-    <div className="home-page">
+    <div className="home-page container">
       <Wizard />
     </div>
   );

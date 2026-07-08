@@ -20,7 +20,7 @@ function Wizard() {
     isGenerating,
     currentGenStep,
     coverUrl,
-    pdfUrl,
+    pdfPath,
     error,
     failedStep,
     genSteps,
@@ -52,7 +52,7 @@ function Wizard() {
             currentGenStep={currentGenStep}
             genSteps={genSteps}
             coverUrl={coverUrl}
-            pdfUrl={pdfUrl}
+            pdfPath={pdfPath}
           />
         ) : (
           <StepContent
