@@ -65,22 +65,22 @@ export const GenerationScreen = ({
           </div>
         ))}
       </div>
-      {coverUrl && (
+      {coverUrl && !pdfPath && (
         <div className="cover-preview">
           <img
-            src={coverUrl}
+            src={"http://localhost:3000" + coverUrl}
             alt="Обложка"
-            style={{ maxWidth: "100%", marginTop: "20px" }}
+            style={{ maxWidth: "150px", marginTop: "20px" }}
           />
         </div>
       )}
       {pdfPath && (
         <div className="download-link">
-          <a href={pdfPath} target="_blank" rel="noopener noreferrer">
+          <a href={"http://localhost:3000" + pdfPath} target="_blank" rel="noopener noreferrer">
             <img
-              src={coverUrl}
+              src={"http://localhost:3000" + coverUrl}
               alt="Скачать книгу"
-              style={{ maxWidth: "100%" }}
+              style={{ maxWidth: "150px" }}
             />
             <p style={{ textAlign: "center", marginTop: "10px" }}>
               Скачать книгу

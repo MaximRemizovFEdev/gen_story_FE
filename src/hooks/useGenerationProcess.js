@@ -1,6 +1,22 @@
 import { useState, useCallback } from "react";
 import apiService from "../services/ApiService";
 
+const prepareStoryPayload = (form) => ({
+  phone: form.phone,
+  childName: form.childName,
+  ageGroup: form.ageGroup,
+  heroType:
+    form.heroType === "Свой вариант"
+      ? form.heroCustom.trim()
+      : form.heroType,
+  adventureGoal:
+    form.adventureGoal === "Свой вариант"
+      ? form.adventureCustom.trim()
+      : form.adventureGoal,
+  storyMood: form.storyMood,
+  interests: form.interests,
+});
+
 export const useGenerationProcess = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentGenStep, setCurrentGenStep] = useState(0);
@@ -29,7 +45,9 @@ export const useGenerationProcess = () => {
       try {
         // Шаг 1: Генерация сюжета
         console.log("📝 Шаг 1: Генерация сюжета...");
-        const responseStory = await apiService.generateStory(form);
+        const responseStory = await apiService.generateStory(
+          prepareStoryPayload(form),
+        );
         setCurrentGenStep(1);
         setStoryId(responseStory.storyId);
 
@@ -38,7 +56,7 @@ export const useGenerationProcess = () => {
         const coverResp = await apiService.generateCover({
           ...responseStory,
         });
-        setCoverUrl(coverResp.coverPath);
+        setCoverUrl(coverResp.coverUrl);
         setCurrentGenStep(2);
 
         // Шаг 3: Генерация сцен
@@ -53,7 +71,7 @@ export const useGenerationProcess = () => {
         const bookResp = await apiService.generateBook({
           ...responseStory,
         });
-        setPdfPath(bookResp.pdfPath);
+        setPdfPath(bookResp.downloadUrl);
         setCurrentGenStep(4);
 
         console.log("✅ Генерация завершена!");
@@ -82,7 +100,9 @@ export const useGenerationProcess = () => {
         if (savedStep <= 0) {
           setFailedStep(0);
 
-          const responseStory = await apiService.generateStory(form);
+          const responseStory = await apiService.generateStory(
+            prepareStoryPayload(form),
+          );
 
           currentStoryId = responseStory.storyId;
           setStoryId(currentStoryId);
@@ -97,7 +117,7 @@ export const useGenerationProcess = () => {
             storyId: currentStoryId,
           });
 
-          setCoverUrl(coverResp.url);
+          setCoverUrl(coverResp.coverUrl);
           setCurrentGenStep(2);
         }
 
@@ -120,7 +140,7 @@ export const useGenerationProcess = () => {
             storyId: currentStoryId,
           });
 
-          setPdfPath(bookResp.pdfPath);
+          setPdfPath(bookResp.downloadUrl);
           setCurrentGenStep(4);
         }
 
