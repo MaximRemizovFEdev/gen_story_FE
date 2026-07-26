@@ -52,6 +52,25 @@ class ApiService {
     if (!response.ok) throw new Error('Ошибка создания книги');
     return response.json();
   }
+
+  async getUserBooks(phone, signal) {
+    const response = await fetch(
+      `${this.baseUrl}/books/${encodeURIComponent(phone)}`,
+      {
+        headers: {
+          Accept: 'application/json'
+        },
+        signal
+      }
+    );
+    if (!response.ok) throw new Error('Ошибка загрузки списка книг');
+    return response.json();
+  }
+
+  getFileUrl(path) {
+    if (!path || /^https?:\/\//i.test(path)) return path;
+    return new URL(path, this.baseUrl).toString();
+  }
 }
 
 const apiService = new ApiService();

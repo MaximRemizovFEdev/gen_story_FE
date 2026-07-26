@@ -43,3 +43,49 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+.user-books {
+  margin-top: 2rem;
+}
+
+.user-books-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.user-book {
+  margin-top: 0;
+}
+
+.user-book h3 {
+  margin: 0 0 0.75rem;
+  text-align: center;
+}
+
+.user-book img {
+  display: block;
+  width: 150px;
+  max-width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.user-book time {
+  margin-bottom: 0.75rem;
+  color: #666;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.user-book a {
+  text-align: center;
+}
+
+.user-books-status,
+.user-books-error {
+  margin-top: 1.5rem;
+}
+
+.user-books-error {
+  color: #b45309;
+}

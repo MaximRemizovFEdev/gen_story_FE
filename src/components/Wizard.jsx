@@ -3,7 +3,9 @@ import { useWizardForm } from '../hooks/useWizardForm';
 import { useGenerationProcess } from '../hooks/useGenerationProcess';
 import { StepContent } from './steps/StepContent';
 import { GenerationScreen } from './Progress/GenerationScreen';
+import { UserBooks } from './books/UserBooks';
 import { steps } from '../config/steps';
+import { useUserBooks } from '../hooks/useUserBooks';
 
 function Wizard() {
   const {
@@ -27,6 +29,12 @@ function Wizard() {
     startGeneration,
     retryFailedStep
   } = useGenerationProcess();
+
+  const {
+    books,
+    isLoading: areBooksLoading,
+    error: booksError
+  } = useUserBooks(form.phone, step === 1 && !isGenerating);
 
   const handleSubmit = () => {
     startGeneration(form);
@@ -59,6 +67,13 @@ function Wizard() {
             currentField={current?.field}
             form={form}
             handleChange={handleChange}
+          />
+        )}
+        {step === 1 && !isGenerating && (
+          <UserBooks
+            books={books}
+            isLoading={areBooksLoading}
+            error={booksError}
           />
         )}
       </div>
