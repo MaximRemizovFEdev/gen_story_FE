@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import apiService from '../services/ApiService';
+import { isValidPhone } from '../utils/phone';
 
 export const useUserBooks = (phone, enabled) => {
   const [books, setBooks] = useState([]);
@@ -12,7 +13,7 @@ export const useUserBooks = (phone, enabled) => {
     setIsLoading(false);
 
     const normalizedPhone = phone.trim();
-    if (!enabled || !/^\d+$/.test(normalizedPhone)) return undefined;
+    if (!enabled || !isValidPhone(normalizedPhone)) return undefined;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
