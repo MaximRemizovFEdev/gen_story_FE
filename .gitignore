@@ -21,7 +21,4 @@ yarnand npm logs
 # OS files
 .DS_Store
 
-# package lock files
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
+# Keep npm's lock file in version control for reproducible builds.

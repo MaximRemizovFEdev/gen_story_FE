@@ -1,6 +1,6 @@
 class ApiService {
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    this.baseUrl = import.meta.env.VITE_API_URL || '/api';
     console.log('API Base URL:', this.baseUrl);
   }
 
