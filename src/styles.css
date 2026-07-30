@@ -44,6 +44,17 @@ body {
   100% { transform: rotate(360deg); }
 }
 
+.home-page {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+}
+
+.home-page__content {
+  position: relative;
+  z-index: 1;
+}
+
 .user-books {
   margin-top: 2rem;
 }
