@@ -19,7 +19,8 @@ function Wizard() {
   } = useWizardForm();
 
   const {
-    isGenerating,
+    status,
+    showGenerationScreen,
     currentGenStep,
     coverUrl,
     pdfPath,
@@ -27,14 +28,15 @@ function Wizard() {
     failedStep,
     genSteps,
     startGeneration,
-    retryFailedStep
+    retryFailedStep,
+    resetGeneration
   } = useGenerationProcess();
 
   const {
     books,
     isLoading: areBooksLoading,
     error: booksError
-  } = useUserBooks(form.phone, step === 1 && !isGenerating);
+  } = useUserBooks(form.phone, step === 1 && !showGenerationScreen);
 
   const handleSubmit = () => {
     startGeneration(form);
@@ -52,8 +54,9 @@ function Wizard() {
         Шаг {step} из {steps.length}
       </div>
       <div className="step-content">
-        {isGenerating ? (
+        {showGenerationScreen ? (
           <GenerationScreen
+            status={status}
             error={error}
             failedStep={failedStep}
             retryFailedStep={handleRetry}
@@ -61,6 +64,7 @@ function Wizard() {
             genSteps={genSteps}
             coverUrl={coverUrl}
             pdfPath={pdfPath}
+            resetGeneration={resetGeneration}
           />
         ) : (
           <StepContent
@@ -69,31 +73,31 @@ function Wizard() {
             handleChange={handleChange}
           />
         )}
-        {step === 1 && !isGenerating && (
-          <UserBooks
-            books={books}
-            isLoading={areBooksLoading}
-            error={booksError}
-          />
-        )}
       </div>
       <div className="buttons">
-        {step > 1 && !isGenerating && (
+        {step > 1 && !showGenerationScreen && (
           <button onClick={goBack} disabled={!isStepValid()}>
             Назад
           </button>
         )}
-        {step < steps.length && !isGenerating && (
+        {step < steps.length && !showGenerationScreen && (
           <button onClick={goNext} disabled={!isStepValid()}>
             Далее
           </button>
         )}
-        {step === steps.length && !isGenerating && (
+        {step === steps.length && !showGenerationScreen && (
           <button onClick={handleSubmit} disabled={!isStepValid()}>
             Создать книгу
           </button>
         )}
       </div>
+      {step === 1 && !showGenerationScreen && (
+        <UserBooks
+          books={books}
+          isLoading={areBooksLoading}
+          error={booksError}
+        />
+      )}
     </div>
   );
 }

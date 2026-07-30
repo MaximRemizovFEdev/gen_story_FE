@@ -1,75 +1,97 @@
 class ApiService {
   constructor() {
-    // Берем URL из переменных окружения или используем пустую строку (относительный путь)
     this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-    console.log('API Base URL:', this.baseUrl); // 👈 для отладки
+    console.log('API Base URL:', this.baseUrl);
+  }
+
+  async request(path, options, fallbackMessage) {
+    let response;
+
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, options);
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+
+      const networkError = new Error(`${fallbackMessage}. Не удалось связаться с сервером`);
+      networkError.endpoint = path;
+      networkError.cause = error;
+      throw networkError;
+    }
+
+    if (!response.ok) {
+      let serverMessage = '';
+
+      try {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const body = await response.json();
+          serverMessage = body?.message || body?.error || '';
+        } else {
+          const body = await response.text();
+          if (body && !/<[a-z][\s\S]*>/i.test(body)) {
+            serverMessage = body.slice(0, 300);
+          }
+        }
+      } catch {
+        // Use the endpoint-specific fallback when the response body is unreadable.
+      }
+
+      const requestError = new Error(serverMessage || fallbackMessage);
+      requestError.status = response.status;
+      requestError.endpoint = path;
+      throw requestError;
+    }
+
+    return response.json();
   }
 
   async generateStory(formData) {
-    const response = await fetch(`${this.baseUrl}/generate-story`, {
+    return this.request('/generate-story', {
       method: 'POST',
       body: JSON.stringify(formData),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Ошибка генерации сценария');
-    return response.json();
+      headers: { 'Content-Type': 'application/json' }
+    }, 'Ошибка генерации сценария');
   }
 
   async generateCover(formData) {
-    const response = await fetch(`${this.baseUrl}/generate-cover`, {
+    return this.request('/generate-cover', {
       method: 'POST',
       body: JSON.stringify(formData),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Ошибка генерации обложки');
-    return response.json();
+      headers: { 'Content-Type': 'application/json' }
+    }, 'Ошибка генерации обложки');
   }
 
   async generateScenes(formData) {
-    const response = await fetch(`${this.baseUrl}/generate-scenes`, {
+    return this.request('/generate-scenes', {
       method: 'POST',
       body: JSON.stringify(formData),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Ошибка генерации иллюстраций');
-    return response.json();
+      headers: { 'Content-Type': 'application/json' }
+    }, 'Ошибка генерации иллюстраций');
   }
 
   async generateBook(formData) {
-    const response = await fetch(`${this.baseUrl}/generate-book`, {
+    return this.request('/generate-book', {
       method: 'POST',
       body: JSON.stringify(formData),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Ошибка создания книги');
-    return response.json();
+      headers: { 'Content-Type': 'application/json' }
+    }, 'Ошибка создания книги');
   }
 
   async getUserBooks(phone, signal) {
-    const response = await fetch(
-      `${this.baseUrl}/books/${encodeURIComponent(phone)}`,
+    return this.request(
+      `/books/${encodeURIComponent(phone)}`,
       {
-        headers: {
-          Accept: 'application/json'
-        },
+        headers: { Accept: 'application/json' },
         signal
-      }
+      },
+      'Ошибка загрузки списка книг'
     );
-    if (!response.ok) throw new Error('Ошибка загрузки списка книг');
-    return response.json();
   }
 
   getFileUrl(path) {
     if (!path || /^https?:\/\//i.test(path)) return path;
-    return new URL(path, this.baseUrl).toString();
+    const apiBaseUrl = new URL(this.baseUrl, window.location.origin);
+    return new URL(path, apiBaseUrl).toString();
   }
 }
 
