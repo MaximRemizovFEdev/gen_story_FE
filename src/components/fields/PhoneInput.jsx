@@ -12,8 +12,8 @@ export const PhoneInput = ({ label, name, value, onChange, required }) => {
   };
 
   return (
-    <div>
-      <label htmlFor={name}>{label}:</label>
+    <div className="form-field">
+      <label htmlFor={name}>{label}</label>
       <input
         id={name}
         type="tel"

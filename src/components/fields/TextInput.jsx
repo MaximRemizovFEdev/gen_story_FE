@@ -1,9 +1,10 @@
 import React from 'react';
 
 export const TextInput = ({ label, name, value, onChange, placeholder, maxLength, required, type = 'text' }) => (
-  <div>
-    <label>{label}:</label>
+  <div className="form-field">
+    <label htmlFor={name}>{label}</label>
     <input
+      id={name}
       type={type}
       name={name}
       value={value}
