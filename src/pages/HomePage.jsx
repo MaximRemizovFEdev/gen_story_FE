@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Wizard from '../components/Wizard';
 import heroArtwork from '../assets/storybook-hero.jpg';
 
 function HomePage() {
+  const [booksPortalTarget, setBooksPortalTarget] = useState(null);
+
   return (
     <div className="home-page">
       <header className="site-header container">
@@ -30,7 +32,7 @@ function HomePage() {
           </p>
 
           <div id="story-builder">
-            <Wizard />
+            <Wizard booksPortalTarget={booksPortalTarget} />
           </div>
 
           <div className="trust-row" aria-label="Преимущества">
@@ -46,6 +48,12 @@ function HomePage() {
           <div className="story-note story-note--bottom"><span>☾</span> Добрая история перед сном</div>
         </aside>
       </main>
+
+      <section
+        className="books-showcase"
+        ref={setBooksPortalTarget}
+        aria-live="polite"
+      />
 
       <section id="how-it-works" className="how-it-works container" aria-label="Как это работает">
         <article><span>1</span><div><h2>Расскажите о ребёнке</h2><p>Имя, возраст и любимые темы.</p></div></article>

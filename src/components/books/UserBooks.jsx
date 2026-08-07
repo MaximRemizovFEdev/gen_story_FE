@@ -21,7 +21,13 @@ export const UserBooks = ({ books, isLoading, error }) => {
 
   return (
     <section className="user-books">
-      <h2>Ваши книги</h2>
+      <div className="user-books__heading container">
+        <div>
+          <span className="user-books__kicker">Личная библиотека</span>
+          <h2>Ваши готовые сказки</h2>
+        </div>
+        <p>Все созданные истории хранятся здесь — их можно скачать и перечитать в любое время.</p>
+      </div>
       <div className="user-books-list">
         {books.map((book) => (
           <article

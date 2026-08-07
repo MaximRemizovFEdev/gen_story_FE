@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useWizardForm } from '../hooks/useWizardForm';
 import { useGenerationProcess } from '../hooks/useGenerationProcess';
 import { StepContent } from './steps/StepContent';
@@ -7,7 +8,7 @@ import { UserBooks } from './books/UserBooks';
 import { steps } from '../config/steps';
 import { useUserBooks } from '../hooks/useUserBooks';
 
-function Wizard() {
+function Wizard({ booksPortalTarget }) {
   const {
     step,
     form,
@@ -99,12 +100,13 @@ function Wizard() {
           </button>
         )}
       </div>
-      {step === 1 && !showGenerationScreen && (
+      {booksPortalTarget && step === 1 && !showGenerationScreen && createPortal(
         <UserBooks
           books={books}
           isLoading={areBooksLoading}
           error={booksError}
-        />
+        />,
+        booksPortalTarget,
       )}
     </div>
   );
