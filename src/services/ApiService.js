@@ -42,6 +42,11 @@ class ApiService {
       throw requestError;
     }
 
+    if (response.status === 204) return null;
+
+    const responseContentType = response.headers.get('content-type') || '';
+    if (!responseContentType.includes('application/json')) return null;
+
     return response.json();
   }
 
@@ -85,6 +90,32 @@ class ApiService {
         signal
       },
       'Ошибка загрузки списка книг'
+    );
+  }
+
+  async getStoryScenes(phone, storyId, signal) {
+    return this.request(
+      `/stories/${encodeURIComponent(phone)}/${encodeURIComponent(storyId)}/scenes`,
+      {
+        headers: { Accept: 'application/json' },
+        signal
+      },
+      'Не удалось загрузить сцены сказки'
+    );
+  }
+
+  async updateStoryScenes(phone, storyId, scenes) {
+    return this.request(
+      `/stories/${encodeURIComponent(phone)}/${encodeURIComponent(storyId)}/scenes`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ scenes }),
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
+        }
+      },
+      'Не удалось сохранить изменения'
     );
   }
 

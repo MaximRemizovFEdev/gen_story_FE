@@ -105,6 +105,7 @@ function Wizard({ booksPortalTarget }) {
           books={books}
           isLoading={areBooksLoading}
           error={booksError}
+          phone={form.phone}
         />,
         booksPortalTarget,
       )}

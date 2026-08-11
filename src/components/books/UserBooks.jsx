@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import apiService from '../../services/ApiService';
+import { SceneEditorModal } from './SceneEditorModal';
 
 const formatGeneratedAt = (generatedAt) => {
   const date = new Date(generatedAt);
@@ -14,7 +15,9 @@ const formatGeneratedAt = (generatedAt) => {
   }).format(date);
 };
 
-export const UserBooks = ({ books, isLoading, error }) => {
+export const UserBooks = ({ books, isLoading, error, phone }) => {
+  const [editingBook, setEditingBook] = useState(null);
+
   if (isLoading) return <p className="user-books-status">Загружаем ваши книги...</p>;
   if (error) return <p className="user-books-error">{error}</p>;
   if (!books.length) return null;
@@ -29,11 +32,21 @@ export const UserBooks = ({ books, isLoading, error }) => {
         <p>Все созданные истории хранятся здесь — их можно скачать и перечитать в любое время.</p>
       </div>
       <div className="user-books-list">
-        {books.map((book) => (
-          <article
-            className="download-link user-book"
-            key={`${book.downloadUrl}-${book.generatedAt}`}
-          >
+        {books.map((book) => {
+          const storyId = book.storyId ?? book.id;
+
+          return (
+          <article className="download-link user-book" key={storyId ?? `${book.downloadUrl}-${book.generatedAt}`}>
+            <button
+              type="button"
+              className="user-book__edit"
+              onClick={() => setEditingBook({ ...book, storyId })}
+              disabled={!storyId}
+              aria-label={`Редактировать сцены сказки «${book.title}»`}
+              title={storyId ? 'Редактировать сцены' : 'Для этой книги не найден storyId'}
+            >
+              <span aria-hidden="true">✎</span>
+            </button>
             <h3>{book.title}</h3>
             <img
               src={apiService.getFileUrl(book.coverUrl)}
@@ -50,8 +63,16 @@ export const UserBooks = ({ books, isLoading, error }) => {
               Скачать
             </a>
           </article>
-        ))}
+          );
+        })}
       </div>
+      {editingBook && (
+        <SceneEditorModal
+          book={editingBook}
+          phone={phone}
+          onClose={() => setEditingBook(null)}
+        />
+      )}
     </section>
   );
 };
