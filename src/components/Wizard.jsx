@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useWizardForm } from '../hooks/useWizardForm';
 import { useGenerationProcess } from '../hooks/useGenerationProcess';
 import { StepContent } from './steps/StepContent';
@@ -7,7 +8,7 @@ import { UserBooks } from './books/UserBooks';
 import { steps } from '../config/steps';
 import { useUserBooks } from '../hooks/useUserBooks';
 
-function Wizard() {
+function Wizard({ booksPortalTarget }) {
   const {
     step,
     form,
@@ -48,11 +49,19 @@ function Wizard() {
 
   return (
     <div className="wizard">
-      <h1>Story Generator Wizard</h1>
-      <p>Заполните анкету, чтобы создать свою книгу.</p>
-      <div className="step-indicator">
-        Шаг {step} из {steps.length}
-      </div>
+      {!showGenerationScreen && (
+        <div className="wizard__header">
+          <div>
+            <span className="wizard__kicker">Шаг {step} из {steps.length}</span>
+            <h2>{current?.label}</h2>
+          </div>
+          <div className="step-indicator" aria-label={`Шаг ${step} из ${steps.length}`}>
+            {steps.map((item, index) => (
+              <span key={item.field} className={index < step ? 'is-active' : ''} aria-hidden="true" />
+            ))}
+          </div>
+        </div>
+      )}
       <div className="step-content">
         {showGenerationScreen ? (
           <GenerationScreen
@@ -76,27 +85,29 @@ function Wizard() {
       </div>
       <div className="buttons">
         {step > 1 && !showGenerationScreen && (
-          <button onClick={goBack} disabled={!isStepValid()}>
-            Назад
+          <button className="button button--secondary" onClick={goBack}>
+            <span aria-hidden="true">←</span> Назад
           </button>
         )}
         {step < steps.length && !showGenerationScreen && (
-          <button onClick={goNext} disabled={!isStepValid()}>
-            Далее
+          <button className="button button--primary" onClick={goNext} disabled={!isStepValid()}>
+            Далее <span aria-hidden="true">→</span>
           </button>
         )}
         {step === steps.length && !showGenerationScreen && (
-          <button onClick={handleSubmit} disabled={!isStepValid()}>
-            Создать книгу
+          <button className="button button--primary" onClick={handleSubmit} disabled={!isStepValid()}>
+            Создать мою сказку <span aria-hidden="true">✦</span>
           </button>
         )}
       </div>
-      {step === 1 && !showGenerationScreen && (
+      {booksPortalTarget && step === 1 && !showGenerationScreen && createPortal(
         <UserBooks
           books={books}
           isLoading={areBooksLoading}
           error={booksError}
-        />
+          phone={form.phone}
+        />,
+        booksPortalTarget,
       )}
     </div>
   );

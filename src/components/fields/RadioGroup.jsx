@@ -1,11 +1,11 @@
 import React from 'react';
 
 export const RadioGroup = ({ label, name, value, onChange, options }) => (
-  <div>
-    <label>{label}:</label>
-    {options.map(option => (
-      <div key={option} style={{ marginBottom: '8px' }}>
-        <label>
+  <fieldset className="choice-field">
+    <legend>{label}</legend>
+    <div className="choice-grid">
+      {options.map((option) => (
+        <label className={`choice-card ${value === option ? 'is-selected' : ''}`} key={option}>
           <input
             type="radio"
             name={name}
@@ -13,9 +13,9 @@ export const RadioGroup = ({ label, name, value, onChange, options }) => (
             checked={value === option}
             onChange={onChange}
           />
-          {option}
+          <span>{option}</span>
         </label>
-      </div>
-    ))}
-  </div>
+      ))}
+    </div>
+  </fieldset>
 );
