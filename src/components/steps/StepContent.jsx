@@ -3,6 +3,7 @@ import { TextInput } from '../fields/TextInput';
 import { RadioGroup } from '../fields/RadioGroup';
 import { CheckboxGroup } from '../fields/CheckboxGroup';
 import { PhoneInput } from '../fields/PhoneInput';
+import { PhotoUpload } from '../fields/PhotoUpload';
 import { ageOptions, heroOptions, adventureOptions, atmosphereOptions, interestsOptions } from '../../config/options';
 
 export const StepContent = ({ currentField, form, handleChange }) => {
@@ -102,6 +103,13 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           onChange={handleChange}
           options={interestsOptions}
           max={3}
+        />
+      );
+    case 'childPhoto':
+      return (
+        <PhotoUpload
+          value={form.childPhoto}
+          onChange={(file) => handleChange({ target: { name: 'childPhoto', value: file } })}
         />
       );
     default:

@@ -81,6 +81,7 @@ export const useGenerationProcess = () => {
       setCurrentGenStep(GENERATION_STEP.STORY);
       const responseStory = await apiService.generateStory(
         prepareStoryPayload(form),
+        form.childPhoto,
       );
       const context = { ...responseStory, phone: form.phone };
       updateGenerationContext(context);
