@@ -50,12 +50,15 @@ class ApiService {
     return response.json();
   }
 
-  async generateStory(formData) {
+  async generateStory(questionnaire, childPhoto) {
+    const body = new FormData();
+    body.append('formData', JSON.stringify(questionnaire));
+    if (childPhoto) body.append('childPhoto', childPhoto);
+
     return this.request('/generate-story', {
       method: 'POST',
-      body: JSON.stringify(formData),
-      headers: { 'Content-Type': 'application/json' }
-    }, 'Ошибка генерации сценария');
+      body
+    }, 'Не удалось создать сказку. Проверьте данные анкеты и фотографию');
   }
 
   async generateCover(formData) {
