@@ -14,6 +14,7 @@ export const useWizardForm = () => {
     adventureCustom: "",
     storyMood: "",
     interests: [],
+    childPhoto: null,
   });
 
   const current = steps[step - 1];
@@ -60,6 +61,8 @@ export const useWizardForm = () => {
           form.interests.length > 0 &&
           form.interests.length <= 3
         );
+      case "childPhoto":
+        return true;
       default:
         return false;
     }
@@ -85,6 +88,7 @@ export const useWizardForm = () => {
       adventureCustom: "",
       storyMood: "",
       interests: [],
+      childPhoto: null,
     });
   }, []);
 

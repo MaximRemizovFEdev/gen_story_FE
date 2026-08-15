@@ -229,6 +229,18 @@ a { color: inherit; }
 .choice-card span { font-size: 14px; font-weight: 650; }
 .field-error, .user-books-error { color: #b44b37; }
 
+.photo-upload__label { display: block; color: #313755; font-size: 14px; font-weight: 700; }
+.photo-upload__hint { margin: 6px 0 13px; color: var(--muted); font-size: 13px; }
+.photo-upload__input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.photo-upload__select { display: grid; width: 100%; min-height: 92px; padding: 15px; place-items: center; border: 1.5px dashed #ad91e8 !important; color: var(--violet-dark); background: rgba(243, 237, 255, .62); }
+.photo-upload__select small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.photo-upload__preview { display: flex; align-items: center; gap: 16px; }
+.photo-upload__preview img { width: 96px; height: 96px; border-radius: 14px; object-fit: cover; }
+.photo-upload__actions { display: flex; align-items: center; gap: 10px; }
+.photo-upload__actions .button { min-height: 42px; padding-inline: 15px; }
+.photo-upload__remove { min-height: 42px !important; padding: 0 8px !important; color: #b44b37; background: transparent; }
+.photo-upload .field-error { margin: 9px 0 0; font-size: 13px; font-weight: 700; }
+
 .buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .button, .wizard button {
   min-height: 49px;

@@ -7,6 +7,7 @@ export const steps = [
   { label: 'Приключение', field: 'adventureGoal' },
   { label: 'Атмосфера сказки', field: 'storyMood' },
   { label: 'Интересы', field: 'interests' },
+  { label: 'Фото ребёнка', field: 'childPhoto' },
 ];
 
 // Порядок генерации шагов
