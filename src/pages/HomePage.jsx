@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import Wizard from '../components/Wizard';
 import heroArtwork from '../assets/storybook-hero.jpg';
+import horizontalLogo from '../assets/horizont-logo.png';
+import { PixelBackground } from '../components/PixelBackground/PixelBackground';
 
 function HomePage() {
   const [booksPortalTarget, setBooksPortalTarget] = useState(null);
@@ -8,12 +10,8 @@ function HomePage() {
   return (
     <div className="home-page">
       <header className="site-header container">
-        <a className="brand" href="#top" aria-label="Сказка рядом — на главную">
-          <span className="brand__mark" aria-hidden="true">
-            <span className="brand__star">★</span>
-            <span className="brand__book">⌄</span>
-          </span>
-          <span>Сказка рядом</span>
+        <a className="brand" href="#top" aria-label="Детки-сказки — на главную">
+          <img className="brand__logo" src={horizontalLogo} alt="Детки-сказки" />
         </a>
         <nav className="site-nav" aria-label="Основная навигация">
           <a href="#how-it-works">Как это работает</a>
@@ -60,6 +58,8 @@ function HomePage() {
         <article><span>2</span><div><h2>Выберите приключение</h2><p>Герои, настроение и волшебный мир.</p></div></article>
         <article><span>3</span><div><h2>Получите книгу</h2><p>Готовая иллюстрированная сказка в PDF.</p></div></article>
       </section>
+
+      <PixelBackground />
     </div>
   );
 }

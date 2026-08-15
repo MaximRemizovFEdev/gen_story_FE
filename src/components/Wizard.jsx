@@ -53,7 +53,6 @@ function Wizard({ booksPortalTarget }) {
         <div className="wizard__header">
           <div>
             <span className="wizard__kicker">Шаг {step} из {steps.length}</span>
-            <h2>{current?.label}</h2>
           </div>
           <div className="step-indicator" aria-label={`Шаг ${step} из ${steps.length}`}>
             {steps.map((item, index) => (

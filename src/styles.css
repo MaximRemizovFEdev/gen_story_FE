@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Ziyada Skar";
+  src: url("./fonts/ZIYADASKAR-REGULAR.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
   color: #172044;
@@ -59,17 +67,10 @@ a { color: inherit; }
   display: inline-flex;
   align-items: center;
   width: max-content;
-  gap: 13px;
-  color: var(--ink);
-  font-family: Georgia, serif;
-  font-size: clamp(23px, 2vw, 34px);
-  font-weight: 700;
   text-decoration: none;
 }
 
-.brand__mark { position: relative; display: block; width: 55px; height: 57px; }
-.brand__star { position: absolute; top: -6px; left: 13px; color: var(--gold); font-size: 38px; filter: drop-shadow(0 5px 8px rgba(220, 159, 35, .2)); }
-.brand__book { position: absolute; bottom: -5px; left: 5px; width: 45px; color: var(--ink); font-family: Georgia, serif; font-size: 62px; font-weight: 400; line-height: .6; transform: rotate(180deg) scaleX(1.2); }
+.brand__logo { display: block; width: 210px; height: auto; }
 
 .site-nav { display: flex; gap: clamp(28px, 4vw, 64px); }
 .site-nav a { font-size: 17px; font-weight: 700; text-decoration: none; }
@@ -120,6 +121,8 @@ a { color: inherit; }
   line-height: .99;
   letter-spacing: -.045em;
 }
+
+#hero-title { font-family: "Ziyada Skar", Georgia, "Times New Roman", serif; }
 
 .hero__lead {
   max-width: 580px;
@@ -197,7 +200,7 @@ a { color: inherit; }
 .step-content { min-height: 82px; }
 
 .form-field, .choice-field { margin: 0; padding: 0; border: 0; }
-.form-field label, .choice-field legend { display: block; margin-bottom: 10px; color: #313755; font-size: 14px; font-weight: 700; }
+.form-field label, .choice-field legend { display: block; margin-bottom: 10px; color: #313755; font-family: "Ziyada Skar", Georgia, "Times New Roman", serif; font-size: 14px; font-weight: 400; }
 .form-field input {
   width: 100%;
   min-height: 51px;
@@ -229,7 +232,7 @@ a { color: inherit; }
 .choice-card span { font-size: 14px; font-weight: 650; }
 .field-error, .user-books-error { color: #b44b37; }
 
-.photo-upload__label { display: block; color: #313755; font-size: 14px; font-weight: 700; }
+.photo-upload__label { display: block; color: #313755; font-family: "Ziyada Skar", Georgia, "Times New Roman", serif; font-size: 14px; font-weight: 400; }
 .photo-upload__hint { margin: 6px 0 13px; color: var(--muted); font-size: 13px; }
 .photo-upload__input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 .photo-upload__select { display: grid; width: 100%; min-height: 92px; padding: 15px; place-items: center; border: 1.5px dashed #ad91e8 !important; color: var(--violet-dark); background: rgba(243, 237, 255, .62); }
@@ -433,8 +436,7 @@ a { color: inherit; }
 @media (max-width: 760px) {
   .container { width: min(100% - 28px, 1480px); }
   .site-header { min-height: 84px; }
-  .brand { font-size: 23px; }
-  .brand__mark { width: 44px; transform: scale(.82); transform-origin: left center; }
+  .brand__logo { width: 160px; }
   .header-cta { padding: 11px 17px; font-size: 14px; }
   .hero { display: flex; min-height: 0; flex-direction: column; align-items: stretch; padding: 24px 0 42px; }
   .hero__content { order: 2; }
