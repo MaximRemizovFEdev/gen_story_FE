@@ -2,22 +2,11 @@ import React from 'react';
 import { TextInput } from '../fields/TextInput';
 import { RadioGroup } from '../fields/RadioGroup';
 import { CheckboxGroup } from '../fields/CheckboxGroup';
-import { PhoneInput } from '../fields/PhoneInput';
 import { PhotoUpload } from '../fields/PhotoUpload';
 import { ageOptions, heroOptions, adventureOptions, atmosphereOptions, interestsOptions } from '../../config/options';
 
 export const StepContent = ({ currentField, form, handleChange }) => {
   switch (currentField) {
-    case 'phone':
-      return (
-        <PhoneInput
-          label="Телефон"
-          name="phone"
-          value={form.phone}
-          onChange={handleChange}
-          required
-        />
-      );
     case 'childName':
       return (
         <TextInput

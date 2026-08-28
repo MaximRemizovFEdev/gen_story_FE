@@ -3,9 +3,21 @@ import Wizard from '../components/Wizard';
 import heroArtwork from '../assets/storybook-hero.jpg';
 import horizontalLogo from '../assets/horizont-logo.png';
 import { PixelBackground } from '../components/PixelBackground/PixelBackground';
+import { useAuth } from '../auth/AuthContext';
 
 function HomePage() {
   const [booksPortalTarget, setBooksPortalTarget] = useState(null);
+  const { user, logout } = useAuth();
+  const [logoutError, setLogoutError] = useState('');
+
+  const handleLogout = async () => {
+    setLogoutError('');
+    try {
+      await logout();
+    } catch (error) {
+      setLogoutError(error.message);
+    }
+  };
 
   return (
     <div className="home-page">
@@ -17,8 +29,12 @@ function HomePage() {
           <a href="#how-it-works">Как это работает</a>
           <a href="#story-builder">Создать сказку</a>
         </nav>
-        <a className="header-cta" href="#story-builder">Начать</a>
+        <div className="header-account">
+          {user?.phone && <span className="header-account__phone">{user.phone}</span>}
+          <button type="button" className="header-cta" onClick={handleLogout}>Выйти</button>
+        </div>
       </header>
+      {logoutError && <p className="container auth-inline-error" role="alert">{logoutError}</p>}
 
       <main id="top" className="hero container">
         <section className="hero__content" aria-labelledby="hero-title">

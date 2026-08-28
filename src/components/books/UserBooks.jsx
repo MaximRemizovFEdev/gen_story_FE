@@ -15,8 +15,25 @@ const formatGeneratedAt = (generatedAt) => {
   }).format(date);
 };
 
-export const UserBooks = ({ books, isLoading, error, phone }) => {
+export const UserBooks = ({ books, isLoading, error }) => {
   const [editingBook, setEditingBook] = useState(null);
+  const [resourceError, setResourceError] = useState('');
+
+  const handleDownload = async (event, storyId, title) => {
+    event.preventDefault();
+    setResourceError('');
+    try {
+      const blob = await apiService.downloadBook(storyId);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `${title || storyId}.pdf`;
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (requestError) {
+      if (requestError.status !== 401) setResourceError(requestError.status === 404 ? 'Запрошенная книга недоступна.' : requestError.message);
+    }
+  };
 
   if (isLoading) return <p className="user-books-status">Загружаем ваши книги...</p>;
   if (error) return <p className="user-books-error">{error}</p>;
@@ -49,16 +66,18 @@ export const UserBooks = ({ books, isLoading, error, phone }) => {
             </button>
             <h3>{book.title}</h3>
             <img
-              src={apiService.getFileUrl(book.coverUrl)}
+              src={apiService.getCoverUrl(storyId)}
               alt={`Обложка книги «${book.title}»`}
+              onError={() => setResourceError('Обложка одной из книг недоступна.')}
             />
             <time dateTime={book.generatedAt}>
               {formatGeneratedAt(book.generatedAt)}
             </time>
             <a
-              href={apiService.getFileUrl(book.downloadUrl)}
+              href={apiService.getBookDownloadUrl(storyId)}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(event) => handleDownload(event, storyId, book.title)}
             >
               Скачать
             </a>
@@ -66,10 +85,10 @@ export const UserBooks = ({ books, isLoading, error, phone }) => {
           );
         })}
       </div>
+      {resourceError && <p className="user-books-error" role="alert">{resourceError}</p>}
       {editingBook && (
         <SceneEditorModal
           book={editingBook}
-          phone={phone}
           onClose={() => setEditingBook(null)}
         />
       )}

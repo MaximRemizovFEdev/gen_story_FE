@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import apiService from '../services/ApiService';
-import { isValidPhone } from '../utils/phone';
 
-export const useUserBooks = (phone, enabled) => {
+export const useUserBooks = (enabled) => {
   const [books, setBooks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -11,34 +10,19 @@ export const useUserBooks = (phone, enabled) => {
     setBooks([]);
     setError(null);
     setIsLoading(false);
-
-    const normalizedPhone = phone.trim();
-    if (!enabled || !isValidPhone(normalizedPhone)) return undefined;
+    if (!enabled) return undefined;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(async () => {
-      setIsLoading(true);
+    setIsLoading(true);
+    apiService.getUserBooks(controller.signal)
+      .then((result) => setBooks(Array.isArray(result) ? result : []))
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError' && requestError.status !== 401) setError(requestError.message);
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });
 
-      try {
-        const result = await apiService.getUserBooks(
-          normalizedPhone,
-          controller.signal,
-        );
-        setBooks(Array.isArray(result) ? result : []);
-      } catch (requestError) {
-        if (requestError.name !== 'AbortError') {
-          setError(requestError.message);
-        }
-      } finally {
-        if (!controller.signal.aborted) setIsLoading(false);
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [phone, enabled]);
+    return () => controller.abort();
+  }, [enabled]);
 
   return { books, isLoading, error };
 };

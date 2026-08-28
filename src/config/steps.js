@@ -1,6 +1,5 @@
 // Конфигурация шагов оформления книги
 export const steps = [
-  { label: 'Телефон', field: 'phone' },
   { label: 'Имя ребенка', field: 'childName' },
   { label: 'Возраст', field: 'ageGroup' },
   { label: 'Главный герой', field: 'heroType' },
