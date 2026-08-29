@@ -22,3 +22,5 @@ yarnand npm logs
 .DS_Store
 
 # Keep npm's lock file in version control for reproducible builds.
+.agents
+openspec

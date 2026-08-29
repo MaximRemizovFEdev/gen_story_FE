@@ -7,8 +7,10 @@ import { GenerationScreen } from './Progress/GenerationScreen';
 import { UserBooks } from './books/UserBooks';
 import { steps } from '../config/steps';
 import { useUserBooks } from '../hooks/useUserBooks';
+import { useAuth } from '../auth/AuthContext';
 
 function Wizard({ booksPortalTarget }) {
+  const { isAuthenticated } = useAuth();
   const {
     step,
     form,
@@ -37,7 +39,7 @@ function Wizard({ booksPortalTarget }) {
     books,
     isLoading: areBooksLoading,
     error: booksError
-  } = useUserBooks(form.phone, step === 1 && !showGenerationScreen);
+  } = useUserBooks(isAuthenticated && !showGenerationScreen);
 
   const handleSubmit = () => {
     startGeneration(form);
@@ -104,7 +106,6 @@ function Wizard({ booksPortalTarget }) {
           books={books}
           isLoading={areBooksLoading}
           error={booksError}
-          phone={form.phone}
         />,
         booksPortalTarget,
       )}

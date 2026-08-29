@@ -1,5 +1,4 @@
 export interface FormDataType {
-  phone: string;
   childName: string;
   ageGroup: string;
   heroType: string;

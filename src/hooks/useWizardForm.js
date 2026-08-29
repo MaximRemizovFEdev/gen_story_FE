@@ -1,11 +1,9 @@
 import { useState, useCallback } from "react";
 import { steps } from "../config/steps";
-import { isValidPhone } from "../utils/phone";
 
 export const useWizardForm = () => {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    phone: "",
     childName: "",
     ageGroup: "",
     heroType: "",
@@ -37,8 +35,6 @@ export const useWizardForm = () => {
   const isStepValid = useCallback(() => {
     if (!current) return false;
     switch (current.field) {
-      case "phone":
-        return isValidPhone(form.phone);
       case "childName":
         return !!form.childName;
       case "ageGroup":
@@ -74,12 +70,11 @@ export const useWizardForm = () => {
 
   const goNext = useCallback(() => {
     setStep((prev) => Math.min(steps.length, prev + 1));
-  }, [steps.length]);
+  }, []);
 
   const reset = useCallback(() => {
     setStep(1);
     setForm({
-      phone: "",
       childName: "",
       ageGroup: "",
       heroType: "",

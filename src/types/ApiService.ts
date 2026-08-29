@@ -1,24 +1,8 @@
-import { FormDataType } from './types';
+import { FormDataType } from './index';
 
 interface StoryResponse {
-  id: string;
-  text: string;
-  success: boolean;
-}
-
-interface CoverResponse {
-  url: string;
-  timestamp: number;
-}
-
-interface ScenesResponse {
-  images: string[];
-  success: boolean;
-}
-
-interface BookResponse {
-  pdfUrl: string;
-  success: boolean;
+  status: string;
+  storyId: string;
 }
 
 interface ApiError {
@@ -26,6 +10,4 @@ interface ApiError {
   status: number;
 }
 
-// Managed through dependency injection
-const apiService = new ApiService();
-export { fetch, apiService };
+export type { StoryResponse, ApiError, FormDataType };

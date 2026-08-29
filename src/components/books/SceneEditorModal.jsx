@@ -4,7 +4,8 @@ import apiService from '../../services/ApiService';
 
 const countWords = (text) => text.trim().split(/\s+/u).filter(Boolean).length;
 
-export const SceneEditorModal = ({ book, phone, onClose }) => {
+export const SceneEditorModal = ({ book, onClose }) => {
+  const [title, setTitle] = useState(book.title);
   const [scenes, setScenes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -24,8 +25,9 @@ export const SceneEditorModal = ({ book, phone, onClose }) => {
     };
     document.addEventListener('keydown', handleKeyDown);
 
-    apiService.getStoryScenes(phone, book.storyId, controller.signal)
+    apiService.getStoryScenes(book.storyId, controller.signal)
       .then((result) => {
+        setTitle(result?.title || book.title);
         setScenes(Array.isArray(result?.scenes) ? result.scenes : []);
       })
       .catch((requestError) => {
@@ -40,7 +42,7 @@ export const SceneEditorModal = ({ book, phone, onClose }) => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [book.storyId, phone, onClose]);
+  }, [book.storyId, book.title, onClose]);
 
   const handleSceneChange = (sceneId, text) => {
     setScenes((currentScenes) => currentScenes.map((scene) => (
@@ -57,21 +59,22 @@ export const SceneEditorModal = ({ book, phone, onClose }) => {
     setIsSaved(false);
 
     try {
-      await apiService.updateStoryScenes(
-        phone,
+      const updateResult = await apiService.updateStoryScenes(
         book.storyId,
         scenes.map(({ sceneId, text }) => ({ sceneId, text: text.trim() })),
       );
 
-      setSaveStage('rebuilding');
-      try {
-        await apiService.generateBook({ phone, storyId: book.storyId });
-      } catch (rebuildError) {
-        const errorWithContext = new Error(
-          `Тексты сцен сохранены, но книгу не удалось пересобрать. ${rebuildError.message}`,
-        );
-        errorWithContext.cause = rebuildError;
-        throw errorWithContext;
+      if (updateResult?.requiresBookRegeneration) {
+        setSaveStage('rebuilding');
+        try {
+          await apiService.generateBook(book.storyId);
+        } catch (rebuildError) {
+          const errorWithContext = new Error(
+            `Тексты сцен сохранены, но книгу не удалось пересобрать. ${rebuildError.message}`,
+          );
+          errorWithContext.cause = rebuildError;
+          throw errorWithContext;
+        }
       }
 
       setScenes((currentScenes) => currentScenes.map((scene) => ({
@@ -87,7 +90,7 @@ export const SceneEditorModal = ({ book, phone, onClose }) => {
     }
   };
 
-  const hasEmptyScenes = scenes.some((scene) => !scene.text.trim());
+  const hasInvalidScenes = scenes.some((scene) => !scene.text.trim() || scene.text.trim().length > 1500);
 
   return createPortal(
     <div className="scene-modal" role="presentation" onMouseDown={(event) => {
@@ -97,7 +100,7 @@ export const SceneEditorModal = ({ book, phone, onClose }) => {
         <header className="scene-modal__header">
           <div>
             <span className="scene-modal__kicker">Редактор сказки</span>
-            <h2 id="scene-editor-title">{book.title}</h2>
+            <h2 id="scene-editor-title">{title}</h2>
             <p>Немного скорректируйте текст каждой сцены. Рекомендуемый объём — 65–80 слов.</p>
           </div>
           <button ref={closeButtonRef} type="button" className="scene-modal__close" onClick={onClose} aria-label="Закрыть редактор">×</button>
@@ -123,7 +126,11 @@ export const SceneEditorModal = ({ book, phone, onClose }) => {
                   value={scene.text}
                   onChange={(event) => handleSceneChange(scene.sceneId, event.target.value)}
                   rows={7}
+                  maxLength={1500}
                 />
+                <small className={scene.text.trim().length > 1500 ? 'scene-editor__limit is-invalid' : 'scene-editor__limit'}>
+                  {scene.text.trim().length}/1500 символов
+                </small>
                 {!isRecommendedLength && (
                   <small>Рекомендуемый объём: 65–80 слов</small>
                 )}
@@ -140,7 +147,7 @@ export const SceneEditorModal = ({ book, phone, onClose }) => {
             </div>
             <div className="scene-modal__actions">
               <button type="button" className="button button--secondary" onClick={onClose}>Закрыть</button>
-              <button type="button" className="button button--primary" onClick={handleSave} disabled={isSaving || hasEmptyScenes}>
+              <button type="button" className="button button--primary" onClick={handleSave} disabled={isSaving || hasInvalidScenes}>
                 {saveStage === 'saving' && 'Сохраняем тексты…'}
                 {saveStage === 'rebuilding' && 'Пересобираем книгу…'}
                 {saveStage === 'idle' && 'Сохранить и пересобрать'}
