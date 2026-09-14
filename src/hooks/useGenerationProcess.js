@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import apiService from '../services/ApiService';
 
-export const GENERATION_STATUS = Object.freeze({ IDLE: 'idle', RUNNING: 'running', FAILED: 'failed', COMPLETED: 'completed' });
-export const GENERATION_STEP = Object.freeze({ STORY: 0, COVER: 1, SCENES: 2, BOOK: 3 });
+export const FLOW_STAGE = Object.freeze({ STORY: 'story', COVER: 'cover', SCENES: 'scenes', BOOK: 'book' });
+export const FLOW_STATUS = Object.freeze({ PENDING: 'pending', SUCCESS: 'success', ERROR: 'error' });
+export const POLL_INTERVAL_MS = 10_000;
 
 export const prepareStoryPayload = (form) => ({
   childName: form.childName,
@@ -14,107 +15,116 @@ export const prepareStoryPayload = (form) => ({
   interests: form.interests,
 });
 
-const getErrorMessage = (error) => error?.message || 'Произошла ошибка при генерации книги';
+const getErrorMessage = (error) => error?.message || 'Не удалось запустить создание книги';
 
 export const useGenerationProcess = () => {
   const { sessionVersion } = useAuth();
-  const [status, setStatus] = useState(GENERATION_STATUS.IDLE);
-  const [currentGenStep, setCurrentGenStep] = useState(GENERATION_STEP.STORY);
-  const [coverUrl, setCoverUrl] = useState(null);
-  const [pdfPath, setPdfPath] = useState(null);
-  const [error, setError] = useState(null);
-  const [failedStep, setFailedStep] = useState(null);
-  const [generationContext, setGenerationContext] = useState(null);
-  const statusRef = useRef(GENERATION_STATUS.IDLE);
-  const contextRef = useRef(null);
-  const runRef = useRef(0);
+  const [activeFlow, setActiveFlow] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const flowRef = useRef(null);
   const initialSessionVersion = useRef(sessionVersion);
 
-  const genSteps = ['Создаём сценарий', 'Рисуем обложку', 'Генерируем иллюстрации', 'Собираем книгу'];
-  const updateStatus = useCallback((next) => { statusRef.current = next; setStatus(next); }, []);
-  const updateContext = useCallback((next) => { contextRef.current = next; setGenerationContext(next); }, []);
+  const updateFlow = useCallback((next) => {
+    flowRef.current = typeof next === 'function' ? next(flowRef.current) : next;
+    setActiveFlow(flowRef.current);
+  }, []);
 
-  const clearGeneration = useCallback(() => {
-    runRef.current += 1;
-    updateStatus(GENERATION_STATUS.IDLE);
-    setCurrentGenStep(GENERATION_STEP.STORY);
-    setCoverUrl(null); setPdfPath(null); setError(null); setFailedStep(null); updateContext(null);
-  }, [updateContext, updateStatus]);
+  const clearFlow = useCallback(() => {
+    updateFlow(null);
+    setIsSubmitting(false);
+    setSubmitError(null);
+  }, [updateFlow]);
 
   useEffect(() => {
     if (sessionVersion !== initialSessionVersion.current) {
       initialSessionVersion.current = sessionVersion;
-      clearGeneration();
+      clearFlow();
     }
-  }, [sessionVersion, clearGeneration]);
+  }, [sessionVersion, clearFlow]);
 
-  const assertActive = (runId) => {
-    if (runRef.current !== runId) throw Object.assign(new Error('Generation cancelled'), { name: 'AbortError' });
-  };
+  const submit = useCallback(async (submission, replaceFailed = false) => {
+    const current = flowRef.current;
+    if (current && !(replaceFailed && current.status === FLOW_STATUS.ERROR)) return null;
 
-  const runStoryStep = useCallback(async (form, runId) => {
-    setCurrentGenStep(GENERATION_STEP.STORY);
-    const response = await apiService.generateStory(prepareStoryPayload(form), form.childPhoto);
-    assertActive(runId);
-    const context = { storyId: response.storyId };
-    updateContext(context);
-    return context;
-  }, [updateContext]);
-
-  const runCoverStep = useCallback(async ({ storyId }, runId) => {
-    setCurrentGenStep(GENERATION_STEP.COVER);
-    await apiService.generateCover(storyId); assertActive(runId);
-    setCoverUrl(apiService.getCoverUrl(storyId));
-  }, []);
-  const runScenesStep = useCallback(async ({ storyId }, runId) => {
-    setCurrentGenStep(GENERATION_STEP.SCENES);
-    await apiService.generateScenes(storyId); assertActive(runId);
-  }, []);
-  const runBookStep = useCallback(async ({ storyId }, runId) => {
-    setCurrentGenStep(GENERATION_STEP.BOOK);
-    await apiService.generateBook(storyId); assertActive(runId);
-    setPdfPath(apiService.getBookDownloadUrl(storyId));
-  }, []);
-
-  const complete = useCallback(() => {
-    setCurrentGenStep(genSteps.length); setFailedStep(null); setError(null); updateStatus(GENERATION_STATUS.COMPLETED);
-  }, [genSteps.length, updateStatus]);
-
-  const handleFailure = useCallback((failure, step) => {
-    if (failure.name === 'AbortError') return;
-    if (failure.status === 401) { clearGeneration(); return; }
-    setError(getErrorMessage(failure)); setFailedStep(step); setCurrentGenStep(step); updateStatus(GENERATION_STATUS.FAILED);
-  }, [clearGeneration, updateStatus]);
-
-  const executeFrom = useCallback(async (form, firstStep, context) => {
-    const runId = ++runRef.current;
-    let activeStep = firstStep;
+    setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      if (firstStep <= GENERATION_STEP.STORY) { activeStep = GENERATION_STEP.STORY; context = await runStoryStep(form, runId); }
-      if (firstStep <= GENERATION_STEP.COVER) { activeStep = GENERATION_STEP.COVER; await runCoverStep(context, runId); }
-      if (firstStep <= GENERATION_STEP.SCENES) { activeStep = GENERATION_STEP.SCENES; await runScenesStep(context, runId); }
-      if (firstStep <= GENERATION_STEP.BOOK) { activeStep = GENERATION_STEP.BOOK; await runBookStep(context, runId); }
-      assertActive(runId); complete();
-    } catch (failure) { handleFailure(failure, activeStep); }
-  }, [complete, handleFailure, runBookStep, runCoverStep, runScenesStep, runStoryStep]);
+      const response = await apiService.startGenerationFlow(submission.questionnaire, submission.childPhoto);
+      if (response?.status !== FLOW_STATUS.PENDING || !response?.storyId) {
+        throw new Error('Сервер вернул некорректный ответ при запуске генерации');
+      }
+      updateFlow({ storyId: response.storyId, stage: FLOW_STAGE.STORY, status: FLOW_STATUS.PENDING, submission });
+      return response;
+    } catch (error) {
+      if (error?.status !== 401) setSubmitError(getErrorMessage(error));
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [updateFlow]);
 
-  const startGeneration = useCallback((form) => {
-    if (statusRef.current === GENERATION_STATUS.RUNNING) return;
-    updateStatus(GENERATION_STATUS.RUNNING); setError(null); setFailedStep(null); setCoverUrl(null); setPdfPath(null); updateContext(null);
-    return executeFrom(form, GENERATION_STEP.STORY, null);
-  }, [executeFrom, updateContext, updateStatus]);
+  const startGeneration = useCallback((form) => submit({
+    questionnaire: prepareStoryPayload(form),
+    childPhoto: form.childPhoto || null,
+  }), [submit]);
 
-  const retryFailedStep = useCallback((form) => {
-    if (statusRef.current === GENERATION_STATUS.RUNNING || failedStep == null) return;
-    updateStatus(GENERATION_STATUS.RUNNING); setError(null);
-    return executeFrom(form, failedStep, contextRef.current);
-  }, [executeFrom, failedStep, updateStatus]);
+  const retryGeneration = useCallback(() => {
+    const current = flowRef.current;
+    if (!current?.submission || current.status !== FLOW_STATUS.ERROR) return Promise.resolve(null);
+    return submit(current.submission, true);
+  }, [submit]);
 
-  const resetGeneration = useCallback(() => {
-    if (statusRef.current !== GENERATION_STATUS.RUNNING) clearGeneration();
-  }, [clearGeneration]);
+  const storyId = activeFlow?.storyId;
+  const isTerminal = activeFlow?.status === FLOW_STATUS.ERROR
+    || (activeFlow?.stage === FLOW_STAGE.BOOK && activeFlow?.status === FLOW_STATUS.SUCCESS);
 
-  return { status, isGenerating: status === GENERATION_STATUS.RUNNING, showGenerationScreen: status !== GENERATION_STATUS.IDLE,
-    currentGenStep, coverUrl, pdfPath, error, failedStep, generationContext, genSteps,
-    startGeneration, retryFailedStep, resetGeneration };
+  useEffect(() => {
+    if (!storyId || isTerminal) return undefined;
+
+    const controller = new AbortController();
+    let timerId;
+    let disposed = false;
+
+    const poll = async () => {
+      try {
+        const result = await apiService.getGenerationFlowStatus(storyId, controller.signal);
+        if (disposed || result?.storyId !== storyId) return;
+        updateFlow((current) => current?.storyId === storyId ? { ...current, stage: result.stage, status: result.status } : current);
+        if (result.status === FLOW_STATUS.ERROR
+          || (result.stage === FLOW_STAGE.BOOK && result.status === FLOW_STATUS.SUCCESS)) return;
+      } catch (error) {
+        if (disposed || error?.name === 'AbortError') return;
+        if (error?.status === 401) {
+          clearFlow();
+          return;
+        }
+      }
+      if (!disposed) timerId = window.setTimeout(poll, POLL_INTERVAL_MS);
+    };
+
+    poll();
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (timerId) window.clearTimeout(timerId);
+    };
+  }, [storyId, isTerminal, updateFlow, clearFlow]);
+
+  const clearCompletedFlow = useCallback((completedStoryId) => {
+    const current = flowRef.current;
+    if (current?.storyId === completedStoryId
+      && current.stage === FLOW_STAGE.BOOK
+      && current.status === FLOW_STATUS.SUCCESS) clearFlow();
+  }, [clearFlow]);
+
+  return useMemo(() => ({
+    activeFlow,
+    isSubmitting,
+    submitError,
+    hasTrackedFlow: Boolean(activeFlow),
+    startGeneration,
+    retryGeneration,
+    clearCompletedFlow,
+  }), [activeFlow, isSubmitting, submitError, startGeneration, retryGeneration, clearCompletedFlow]);
 };

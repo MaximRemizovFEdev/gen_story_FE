@@ -337,6 +337,21 @@ a { color: inherit; }
 .user-book__edit:hover:not(:disabled) { color: white; background: var(--violet); transform: translateY(-2px) rotate(-4deg); }
 .user-book__edit:focus-visible { outline: 3px solid rgba(116,70,223,.25); outline-offset: 2px; }
 .user-book__edit:disabled { cursor: not-allowed; opacity: .4; }
+.user-book--flow {
+  justify-content: center;
+  min-height: 360px;
+  border: 2px dashed rgba(116, 70, 223, .35);
+  background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(238,231,255,.82));
+  text-align: center;
+}
+.user-book--flow:hover { transform: none; }
+.user-book--flow.is-failed { border-color: rgba(180,75,55,.45); background: rgba(255,241,235,.88); }
+.user-book__placeholder-art { display: grid; width: 92px; height: 116px; margin: 0 auto 18px; place-items: center; border-radius: 13px; color: var(--violet); background: rgba(116,70,223,.1); font-size: 42px; font-weight: 800; }
+.user-book--flow.is-failed .user-book__placeholder-art { color: #b44b37; background: rgba(180,75,55,.1); }
+.user-book__flow-stage { min-height: 2.8em; margin: 0 4px 12px; color: var(--muted); line-height: 1.4; }
+.user-book--flow small { color: var(--muted); overflow-wrap: anywhere; }
+.user-book__retry { align-self: center; margin-top: 18px; }
+.generation-submit-error { margin: 14px 0 0; color: #b44b37; font-weight: 700; }
 .user-books-status, .user-books-error { width: min(100% - 40px, 1480px); margin: 0 auto; }
 
 .scene-modal {

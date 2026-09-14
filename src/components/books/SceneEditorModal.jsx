@@ -67,7 +67,7 @@ export const SceneEditorModal = ({ book, onClose }) => {
       if (updateResult?.requiresBookRegeneration) {
         setSaveStage('rebuilding');
         try {
-          await apiService.generateBook(book.storyId);
+          await apiService.regenerateBook(book.storyId);
         } catch (rebuildError) {
           const errorWithContext = new Error(
             `Тексты сцен сохранены, но книгу не удалось пересобрать. ${rebuildError.message}`,

@@ -35,29 +35,45 @@ describe('ApiService', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('sends questionnaire JSON without ownership identifiers', async () => {
-    fetch.mockResolvedValue(jsonResponse({ status: 'success', storyId: '12-34_28-08-2026' }));
-    await service.generateStory({ childName: 'Миша', interests: ['Космос'] });
-    const [, options] = fetch.mock.calls[0];
-    expect(JSON.parse(options.body)).toEqual({ childName: 'Миша', interests: ['Космос'] });
-    expect(options.credentials).toBe('include');
+  it('starts a JSON generation flow and accepts HTTP 202', async () => {
+    const response = { status: 'pending', storyId: '12-34_19-08-2026' };
+    fetch.mockResolvedValue(jsonResponse(response, 202));
+    await expect(service.startGenerationFlow({ childName: 'Миша', interests: ['Космос'] })).resolves.toEqual(response);
+    expect(fetch).toHaveBeenCalledWith('/api/generate-flow', expect.objectContaining({
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ childName: 'Миша', interests: ['Космос'] }),
+      headers: { 'Content-Type': 'application/json' },
+    }));
   });
 
-  it('sends multipart questionnaire and photo without ownership identifiers', async () => {
-    fetch.mockResolvedValue(jsonResponse({ status: 'success', storyId: '12-34_28-08-2026' }));
+  it('starts a multipart generation flow with the original photo', async () => {
+    fetch.mockResolvedValue(jsonResponse({ status: 'pending', storyId: 'id' }, 202));
     const photo = new File(['image'], 'child.png', { type: 'image/png' });
-    await service.generateStory({ childName: 'Миша' }, photo);
-    const [, options] = fetch.mock.calls[0];
+    await service.startGenerationFlow({ childName: 'Миша' }, photo);
+    const [url, options] = fetch.mock.calls[0];
+    expect(url).toBe('/api/generate-flow');
     expect(options.body).toBeInstanceOf(FormData);
     expect(JSON.parse(options.body.get('formData'))).toEqual({ childName: 'Миша' });
     expect(options.body.get('childPhoto')).toBe(photo);
     expect(options.headers).toBeUndefined();
+    expect(options.credentials).toBe('include');
   });
 
-  it('uses storyId for generation and resources', async () => {
+  it('loads an abortable flow status from the encoded story path', async () => {
+    const response = { storyId: 'story/id', stage: 'scenes', status: 'pending' };
+    fetch.mockResolvedValue(jsonResponse(response));
+    const controller = new AbortController();
+    await expect(service.getGenerationFlowStatus('story/id', controller.signal)).resolves.toEqual(response);
+    expect(fetch).toHaveBeenCalledWith('/api/generate-flow/story%2Fid/status', expect.objectContaining({
+      credentials: 'include', signal: controller.signal, headers: { Accept: 'application/json' },
+    }));
+  });
+
+  it('keeps book regeneration for scene editing and canonical resource URLs', async () => {
     fetch.mockResolvedValue(jsonResponse({ success: true }));
-    await service.generateCover('12-34_28-08-2026');
-    expect(fetch).toHaveBeenCalledWith('/api/generate-cover', expect.objectContaining({
+    await service.regenerateBook('12-34_28-08-2026');
+    expect(fetch).toHaveBeenCalledWith('/api/generate-book', expect.objectContaining({
       body: JSON.stringify({ storyId: '12-34_28-08-2026' }), credentials: 'include',
     }));
     expect(service.getBookDownloadUrl('12-34_28-08-2026')).toBe('/api/books/12-34_28-08-2026/download');

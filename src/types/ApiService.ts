@@ -1,8 +1,14 @@
 import { FormDataType } from './index';
 
-interface StoryResponse {
-  status: string;
+interface GenerationFlowResponse {
+  status: 'pending';
   storyId: string;
+}
+
+interface GenerationFlowStatusResponse {
+  storyId: string;
+  stage: 'story' | 'cover' | 'scenes' | 'book';
+  status: 'pending' | 'success' | 'error';
 }
 
 interface ApiError {
@@ -10,4 +16,4 @@ interface ApiError {
   status: number;
 }
 
-export type { StoryResponse, ApiError, FormDataType };
+export type { GenerationFlowResponse, GenerationFlowStatusResponse, ApiError, FormDataType };

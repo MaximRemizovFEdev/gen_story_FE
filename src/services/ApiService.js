@@ -67,9 +67,9 @@ class ApiService {
     return this.request('/auth/logout', { method: 'POST' }, 'Не удалось выйти', { suppressUnauthorized: true });
   }
 
-  generateStory(questionnaire, childPhoto) {
+  startGenerationFlow(questionnaire, childPhoto) {
     if (!childPhoto) {
-      return this.request('/generate-story', {
+      return this.request('/generate-flow', {
         method: 'POST',
         body: JSON.stringify(questionnaire),
         headers: { 'Content-Type': 'application/json' },
@@ -78,21 +78,23 @@ class ApiService {
     const body = new FormData();
     body.append('formData', JSON.stringify(questionnaire));
     body.append('childPhoto', childPhoto);
-    return this.request('/generate-story', { method: 'POST', body }, 'Не удалось создать сказку. Проверьте данные анкеты и фотографию');
+    return this.request('/generate-flow', { method: 'POST', body }, 'Не удалось запустить создание книги. Проверьте данные анкеты и фотографию');
   }
 
-  storyRequest(path, storyId, fallbackMessage) {
-    return this.request(path, {
+  getGenerationFlowStatus(storyId, signal) {
+    return this.request(`/generate-flow/${encodeURIComponent(storyId)}/status`, {
+      headers: { Accept: 'application/json' },
+      signal,
+    }, 'Не удалось проверить статус создания книги');
+  }
+
+  regenerateBook(storyId) {
+    return this.request('/generate-book', {
       method: 'POST',
       body: JSON.stringify({ storyId }),
       headers: { 'Content-Type': 'application/json' },
-    }, fallbackMessage);
+    }, 'Ошибка пересборки книги');
   }
-
-  generateCover(storyId) { return this.storyRequest('/generate-cover', storyId, 'Ошибка генерации обложки'); }
-  generateScenes(storyId) { return this.storyRequest('/generate-scenes', storyId, 'Ошибка генерации иллюстраций'); }
-  generateBook(storyId) { return this.storyRequest('/generate-book', storyId, 'Ошибка создания книги'); }
-  generatePaintbook(storyId) { return this.storyRequest('/generate-paintbook', storyId, 'Ошибка создания раскраски'); }
 
   getUserBooks(signal) {
     return this.request('/books', { headers: { Accept: 'application/json' }, signal }, 'Ошибка загрузки списка книг');
@@ -116,7 +118,6 @@ class ApiService {
 
   getCoverUrl(storyId) { return this.getFileUrl(`/stories/${encodeURIComponent(storyId)}/cover`); }
   getBookDownloadUrl(storyId) { return this.getFileUrl(`/books/${encodeURIComponent(storyId)}/download`); }
-  getPaintbookDownloadUrl(storyId) { return this.getFileUrl(`/paintbooks/${encodeURIComponent(storyId)}/download`); }
   getSceneImageUrl(storyId, sceneId) { return this.getFileUrl(`/stories/${encodeURIComponent(storyId)}/scenes/${encodeURIComponent(sceneId)}/image`); }
 
   getFileUrl(path) {
