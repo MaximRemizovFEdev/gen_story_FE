@@ -40,4 +40,25 @@ describe('UserBooks', () => {
     await waitFor(() => expect(apiService.downloadBook).toHaveBeenCalled());
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['story', 'Создаём историю'],
+    ['cover', 'Рисуем обложку'],
+    ['scenes', 'Готовим иллюстрации'],
+    ['book', 'Собираем книгу'],
+  ])('renders a non-interactive placeholder for the %s stage', (stage, label) => {
+    render(<UserBooks books={[]} isLoading={false} error={null} activeFlow={{ storyId: 'flow-1', stage, status: 'pending' }} />);
+    const placeholder = screen.getByTestId('generation-placeholder');
+    expect(placeholder).toHaveTextContent(label);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /редактировать/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a whole-flow retry for an explicit backend error', () => {
+    const onRetry = vi.fn();
+    render(<UserBooks books={[]} isLoading={false} error={null} activeFlow={{ storyId: 'flow-1', stage: 'scenes', status: 'error' }} onRetry={onRetry} />);
+    expect(screen.getByText(/ошибка на этапе: готовим иллюстрации/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /попробовать снова/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
 });

@@ -5,7 +5,7 @@ import apiService from '../../services/ApiService';
 import { SceneEditorModal } from './SceneEditorModal';
 
 vi.mock('../../services/ApiService', () => ({ default: {
-  getStoryScenes: vi.fn(), updateStoryScenes: vi.fn(), generateBook: vi.fn(),
+  getStoryScenes: vi.fn(), updateStoryScenes: vi.fn(), regenerateBook: vi.fn(),
 } }));
 
 const book = { storyId: '12-34_28-08-2026', title: 'Старая сказка' };
@@ -15,7 +15,7 @@ describe('SceneEditorModal', () => {
   beforeEach(() => {
     apiService.getStoryScenes.mockResolvedValue({ title: 'Новая сказка', scenes });
     apiService.updateStoryScenes.mockResolvedValue({ success: true, updatedScenes: 2, requiresBookRegeneration: false });
-    apiService.generateBook.mockResolvedValue({});
+    apiService.regenerateBook.mockResolvedValue({});
   });
 
   it('loads title/scenes by storyId and submits the complete set', async () => {
@@ -27,7 +27,7 @@ describe('SceneEditorModal', () => {
     await waitFor(() => expect(apiService.updateStoryScenes).toHaveBeenCalledWith(book.storyId, [
       { sceneId: 1, text: 'Изменённый первый текст' }, { sceneId: 2, text: 'Второй текст' },
     ]));
-    expect(apiService.generateBook).not.toHaveBeenCalled();
+    expect(apiService.regenerateBook).not.toHaveBeenCalled();
   });
 
   it('reports a story 404 without opening a usable editor', async () => {
@@ -56,12 +56,12 @@ describe('SceneEditorModal', () => {
     render(<SceneEditorModal book={book} onClose={vi.fn()} />);
     await screen.findByText('Новая сказка');
     fireEvent.click(screen.getByRole('button', { name: /сохранить и пересобрать/i }));
-    await waitFor(() => expect(apiService.generateBook).toHaveBeenCalledWith(book.storyId));
+    await waitFor(() => expect(apiService.regenerateBook).toHaveBeenCalledWith(book.storyId));
   });
 
   it('reports rebuild failure after scenes were saved', async () => {
     apiService.updateStoryScenes.mockResolvedValue({ success: true, updatedScenes: 2, requiresBookRegeneration: true });
-    apiService.generateBook.mockRejectedValue(new Error('PDF failed'));
+    apiService.regenerateBook.mockRejectedValue(new Error('PDF failed'));
     render(<SceneEditorModal book={book} onClose={vi.fn()} />);
     await screen.findByText('Новая сказка');
     fireEvent.click(screen.getByRole('button', { name: /сохранить и пересобрать/i }));
