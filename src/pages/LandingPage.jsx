@@ -24,7 +24,7 @@ export default function LandingPage() {
               оживают на страницах его собственной книги.
             </p>
             <Link
-              className="button button--primary"
+              className="button button--primary pad"
               to={authenticated ? "/app" : "/auth"}
             >
               {authenticated
