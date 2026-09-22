@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import Wizard from '../components/Wizard';
-import heroArtwork from '../assets/storybook-hero.jpg';
-import horizontalLogo from '../assets/horizont-logo.png';
-import { PixelBackground } from '../components/PixelBackground/PixelBackground';
-import { useAuth } from '../auth/AuthContext';
+import React, { useState } from "react";
+import Wizard from "../components/Wizard";
+import heroArtwork from "../assets/storybook-hero.jpg";
+import horizontalLogo from "../assets/horizont-logo.png";
+import { PixelBackground } from "../components/PixelBackground/PixelBackground";
+import { useAuth } from "../auth/AuthContext";
 
 function HomePage() {
   const [booksPortalTarget, setBooksPortalTarget] = useState(null);
   const { user, logout } = useAuth();
-  const [logoutError, setLogoutError] = useState('');
+  const [logoutError, setLogoutError] = useState("");
 
   const handleLogout = async () => {
-    setLogoutError('');
+    setLogoutError("");
     try {
       await logout();
     } catch (error) {
@@ -23,26 +23,41 @@ function HomePage() {
     <div className="home-page">
       <header className="site-header container">
         <a className="brand" href="#top" aria-label="Детки-сказки — на главную">
-          <img className="brand__logo" src={horizontalLogo} alt="Детки-сказки" />
+          <img
+            className="brand__logo"
+            src={horizontalLogo}
+            alt="Детки-сказки"
+          />
         </a>
         <nav className="site-nav" aria-label="Основная навигация">
           <a href="#how-it-works">Как это работает</a>
           <a href="#story-builder">Создать сказку</a>
         </nav>
         <div className="header-account">
-          {user?.phone && <span className="header-account__phone">{user.phone}</span>}
-          <button type="button" className="header-cta" onClick={handleLogout}>Выйти</button>
+          {user?.phone && (
+            <span className="header-account__phone">{user.phone}</span>
+          )}
+          <button type="button" className="header-cta" onClick={handleLogout}>
+            Выйти
+          </button>
         </div>
       </header>
-      {logoutError && <p className="container auth-inline-error" role="alert">{logoutError}</p>}
+      {logoutError && (
+        <p className="container auth-inline-error" role="alert">
+          {logoutError}
+        </p>
+      )}
 
       <main id="top" className="hero container">
         <section className="hero__content" aria-labelledby="hero-title">
-          <div className="eyebrow"><span aria-hidden="true">✦</span> Персональная сказка за несколько минут</div>
+          <div className="eyebrow">
+            <span aria-hidden="true">✦</span> Персональная сказка за несколько
+            минут
+          </div>
           <h1 id="hero-title">Сказка, где ваш ребёнок — главный герой</h1>
           <p className="hero__lead">
-            Ответьте на несколько простых вопросов — и получите добрую историю
-            с любимыми героями, интересами и приключением вашего малыша.
+            Ответьте на несколько простых вопросов — и получите добрую историю с
+            любимыми героями, интересами и приключением вашего малыша.
           </p>
 
           <div id="story-builder">
@@ -50,16 +65,27 @@ function HomePage() {
           </div>
 
           <div className="trust-row" aria-label="Преимущества">
-            <span><b aria-hidden="true">✓</b> Данные в безопасности</span>
-            <span><b aria-hidden="true">✦</b> Уникальная история</span>
+            <span>
+              <b aria-hidden="true">✓</b> Данные в безопасности
+            </span>
+            <span>
+              <b aria-hidden="true">✦</b> Уникальная история
+            </span>
           </div>
         </section>
 
         <aside className="hero__visual" aria-label="Сказочное приключение">
           <div className="hero__halo" />
-          <img src={heroArtwork} alt="Ребёнок летит на добром драконе из волшебной книги" />
-          <div className="story-note story-note--top"><span>★</span> Герой — ваш ребёнок</div>
-          <div className="story-note story-note--bottom"><span>☾</span> Добрая история перед сном</div>
+          <img
+            src={heroArtwork}
+            alt="Ребёнок летит на добром драконе из волшебной книги"
+          />
+          <div className="story-note story-note--top">
+            <span>★</span> Герой — ваш ребёнок
+          </div>
+          <div className="story-note story-note--bottom">
+            <span>☾</span> Добрая история перед сном
+          </div>
         </aside>
       </main>
 
@@ -69,10 +95,32 @@ function HomePage() {
         aria-live="polite"
       />
 
-      <section id="how-it-works" className="how-it-works container" aria-label="Как это работает">
-        <article><span>1</span><div><h2>Расскажите о ребёнке</h2><p>Имя, возраст и любимые темы.</p></div></article>
-        <article><span>2</span><div><h2>Выберите приключение</h2><p>Герои, настроение и волшебный мир.</p></div></article>
-        <article><span>3</span><div><h2>Получите книгу</h2><p>Готовая иллюстрированная сказка в PDF.</p></div></article>
+      <section
+        id="how-it-works"
+        className="how-it-works container"
+        aria-label="Как это работает"
+      >
+        <article>
+          <span>1</span>
+          <div>
+            <h2>Расскажите о ребёнке</h2>
+            <p>Имя, возраст и любимые темы.</p>
+          </div>
+        </article>
+        <article>
+          <span>2</span>
+          <div>
+            <h2>Выберите приключение</h2>
+            <p>Герои, настроение и волшебный мир.</p>
+          </div>
+        </article>
+        <article>
+          <span>3</span>
+          <div>
+            <h2>Получите книгу</h2>
+            <p>Готовая иллюстрированная сказка в PDF.</p>
+          </div>
+        </article>
       </section>
 
       <PixelBackground />

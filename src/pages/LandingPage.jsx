@@ -94,7 +94,7 @@ export default function LandingPage() {
             </p>
             <Link
               to={authenticated ? "/app" : "/auth"}
-              className="button button--primary"
+              className="button button--primary pad"
             >
               {authenticated ? "В личный кабинет" : "Войти и создать сказку"}
             </Link>
