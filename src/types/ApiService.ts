@@ -11,9 +11,28 @@ interface GenerationFlowStatusResponse {
   status: 'pending' | 'success' | 'error';
 }
 
+interface GenerationPaymentStatusResponse {
+  paid: boolean;
+  purchaseId?: string;
+  paidAt?: string;
+}
+
+interface GenerationPaymentCreateResponse {
+  purchaseId: string;
+  providerPaymentId: string;
+  confirmationUrl: string;
+}
+
 interface ApiError {
   message: string;
   status: number;
 }
 
-export type { GenerationFlowResponse, GenerationFlowStatusResponse, ApiError, FormDataType };
+export type {
+  GenerationFlowResponse,
+  GenerationFlowStatusResponse,
+  GenerationPaymentStatusResponse,
+  GenerationPaymentCreateResponse,
+  ApiError,
+  FormDataType,
+};

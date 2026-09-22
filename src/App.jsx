@@ -15,6 +15,7 @@ import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import AuthSuccessPage from "./pages/AuthSuccessPage";
 import AuthErrorPage from "./pages/AuthErrorPage";
+import PaymentReturnPage from "./pages/PaymentReturnPage";
 import { AUTH_STATUS, AuthProvider, useAuth } from "./auth/AuthContext";
 
 export function RootRoute() {
@@ -67,6 +68,7 @@ export function AppRoutes() {
           />
           <Route path="/auth/success" element={<AuthSuccessPage />} />
           <Route path="/auth/error" element={<AuthErrorPage />} />
+          <Route path="/payment-return" element={<PaymentReturnPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>

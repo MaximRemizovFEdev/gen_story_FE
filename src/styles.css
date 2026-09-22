@@ -352,6 +352,10 @@ a { color: inherit; }
 .user-book--flow small { color: var(--muted); overflow-wrap: anywhere; }
 .user-book__retry { align-self: center; margin-top: 18px; }
 .generation-submit-error { margin: 14px 0 0; color: #b44b37; font-weight: 700; }
+.payment-wait { margin-top: 16px; padding: 14px 16px; border: 1px solid rgba(116,70,223,.18); border-radius: 12px; background: rgba(248,245,255,.8); color: #4c3f67; }
+.payment-wait p { margin: 0; line-height: 1.5; }
+.payment-wait__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.payment-wait__actions .button { min-height: 42px; padding-inline: 16px; }
 .user-books-status, .user-books-error { width: min(100% - 40px, 1480px); margin: 0 auto; }
 
 .scene-modal {
