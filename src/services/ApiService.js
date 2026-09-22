@@ -67,6 +67,19 @@ class ApiService {
     return this.request('/auth/logout', { method: 'POST' }, 'Не удалось выйти', { suppressUnauthorized: true });
   }
 
+  getGenerationPaymentStatus() {
+    return this.request('/payments/generation/status', {
+      headers: { Accept: 'application/json' },
+    }, 'Не удалось проверить статус оплаты');
+  }
+
+  createGenerationPayment() {
+    return this.request('/payments/generation/create', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+    }, 'Не удалось создать платеж');
+  }
+
   startGenerationFlow(questionnaire, childPhoto) {
     if (!childPhoto) {
       return this.request('/generate-flow', {

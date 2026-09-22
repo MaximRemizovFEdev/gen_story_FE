@@ -35,6 +35,42 @@ describe('ApiService', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it('checks and creates generation payments with session credentials', async () => {
+    const paidStatus = { paid: true, purchaseId: 'purchase_id', paidAt: '2026-09-22T10:00:00.000Z' };
+    const payment = {
+      purchaseId: 'purchase_id',
+      providerPaymentId: 'yookassa_payment_id',
+      confirmationUrl: 'https://yoomoney.ru/checkout/payments/123',
+    };
+    fetch
+      .mockResolvedValueOnce(jsonResponse(paidStatus))
+      .mockResolvedValueOnce(jsonResponse(payment, 201));
+
+    await expect(service.getGenerationPaymentStatus()).resolves.toEqual(paidStatus);
+    await expect(service.createGenerationPayment()).resolves.toEqual(payment);
+
+    expect(fetch).toHaveBeenNthCalledWith(1, '/api/payments/generation/status', expect.objectContaining({
+      credentials: 'include', headers: { Accept: 'application/json' },
+    }));
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/payments/generation/create', expect.objectContaining({
+      method: 'POST', credentials: 'include', headers: { Accept: 'application/json' },
+    }));
+    expect(fetch.mock.calls[1][1]).not.toHaveProperty('body');
+  });
+
+  it('surfaces generation payment requirements without expiring the session', async () => {
+    const handler = vi.fn();
+    service.setUnauthorizedHandler(handler);
+    fetch.mockResolvedValue(jsonResponse({ error: 'Payment required' }, 402));
+
+    await expect(service.startGenerationFlow({ childName: 'Миша' })).rejects.toMatchObject({
+      status: 402,
+      endpoint: '/generate-flow',
+      message: 'Payment required',
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it('starts a JSON generation flow and accepts HTTP 202', async () => {
     const response = { status: 'pending', storyId: '12-34_19-08-2026' };
     fetch.mockResolvedValue(jsonResponse(response, 202));
