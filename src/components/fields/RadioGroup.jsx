@@ -1,11 +1,14 @@
-import React from 'react';
+import React from "react";
 
 export const RadioGroup = ({ label, name, value, onChange, options }) => (
   <fieldset className="choice-field">
     <legend>{label}</legend>
     <div className="choice-grid">
       {options.map((option) => (
-        <label className={`choice-card ${value === option ? 'is-selected' : ''}`} key={option}>
+        <label
+          className={`choice-card ${value === option ? "is-selected" : ""}`}
+          key={option}
+        >
           <input
             type="radio"
             name={name}
