@@ -1,6 +1,15 @@
-import React from 'react';
+import React from "react";
 
-export const TextInput = ({ label, name, value, onChange, placeholder, maxLength, required, type = 'text' }) => (
+export const TextInput = ({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  required,
+  type = "text",
+}) => (
   <div className="form-field">
     <label htmlFor={name}>{label}</label>
     <input

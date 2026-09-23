@@ -95,10 +95,12 @@ const getPixels = (pattern) => {
   return pattern.flatMap((row, rowIndex) =>
     [...row].flatMap((pixel, columnIndex) =>
       pixel === "1"
-        ? [{
-            x: offsetX + columnIndex * PIXEL_SIZE,
-            y: offsetY + rowIndex * PIXEL_SIZE,
-          }]
+        ? [
+            {
+              x: offsetX + columnIndex * PIXEL_SIZE,
+              y: offsetY + rowIndex * PIXEL_SIZE,
+            },
+          ]
         : [],
     ),
   );

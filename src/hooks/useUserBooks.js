@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import apiService from '../services/ApiService';
+import { useCallback, useEffect, useRef, useState } from "react";
+import apiService from "../services/ApiService";
 
 export const useUserBooks = (enabled) => {
   const [books, setBooks] = useState([]);
@@ -22,7 +22,8 @@ export const useUserBooks = (enabled) => {
       if (!controller.signal.aborted) setBooks(nextBooks);
       return nextBooks;
     } catch (requestError) {
-      if (requestError.name !== 'AbortError' && requestError.status !== 401) setError(requestError.message);
+      if (requestError.name !== "AbortError" && requestError.status !== 401)
+        setError(requestError.message);
       throw requestError;
     } finally {
       if (!controller.signal.aborted) setIsLoading(false);

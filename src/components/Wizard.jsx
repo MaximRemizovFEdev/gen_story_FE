@@ -1,24 +1,40 @@
-import React, { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { useWizardForm } from '../hooks/useWizardForm';
-import { PAYMENT_STATE, useGenerationProcess } from '../hooks/useGenerationProcess';
-import { StepContent } from './steps/StepContent';
-import { UserBooks } from './books/UserBooks';
-import { steps } from '../config/steps';
-import { useUserBooks } from '../hooks/useUserBooks';
-import { useAuth } from '../auth/AuthContext';
+import React, { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { useWizardForm } from "../hooks/useWizardForm";
+import {
+  PAYMENT_STATE,
+  useGenerationProcess,
+} from "../hooks/useGenerationProcess";
+import { StepContent } from "./steps/StepContent";
+import { UserBooks } from "./books/UserBooks";
+import { steps } from "../config/steps";
+import { useUserBooks } from "../hooks/useUserBooks";
+import { useAuth } from "../auth/AuthContext";
 
 const getSubmitButtonText = (paymentState, isSubmitting) => {
-  if (!isSubmitting) return 'Создать мою сказку';
-  if (paymentState === PAYMENT_STATE.CHECKING) return 'Проверяем оплату…';
-  if (paymentState === PAYMENT_STATE.CREATING) return 'Готовим оплату…';
-  if (paymentState === PAYMENT_STATE.WAITING || paymentState === PAYMENT_STATE.OPEN_BLOCKED) return 'Ждём оплату…';
-  return 'Запускаем создание…';
+  if (!isSubmitting) return "Создать мою сказку";
+  if (paymentState === PAYMENT_STATE.CHECKING) return "Проверяем оплату…";
+  if (paymentState === PAYMENT_STATE.CREATING) return "Готовим оплату…";
+  if (
+    paymentState === PAYMENT_STATE.WAITING ||
+    paymentState === PAYMENT_STATE.OPEN_BLOCKED
+  )
+    return "Ждём оплату…";
+  return "Запускаем создание…";
 };
 
 function Wizard({ booksPortalTarget }) {
   const { isAuthenticated } = useAuth();
-  const { step, form, current, handleChange, isStepValid, goBack, goNext, reset } = useWizardForm();
+  const {
+    step,
+    form,
+    current,
+    handleChange,
+    isStepValid,
+    goBack,
+    goNext,
+    reset,
+  } = useWizardForm();
   const {
     activeFlow,
     isSubmitting,
@@ -33,16 +49,26 @@ function Wizard({ booksPortalTarget }) {
     reopenPayment,
     checkPaymentStatus,
   } = useGenerationProcess();
-  const { books, isLoading, error: booksError, reload: reloadBooks } = useUserBooks(isAuthenticated);
+  const {
+    books,
+    isLoading,
+    error: booksError,
+    reload: reloadBooks,
+  } = useUserBooks(isAuthenticated);
   const completionRefreshRef = useRef(null);
 
   useEffect(() => {
-    if (activeFlow?.stage !== 'book' || activeFlow?.status !== 'success') return;
+    if (activeFlow?.stage !== "book" || activeFlow?.status !== "success")
+      return;
     if (completionRefreshRef.current === activeFlow.storyId) return;
     completionRefreshRef.current = activeFlow.storyId;
     reloadBooks()
       .then((nextBooks) => {
-        if (nextBooks.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)) {
+        if (
+          nextBooks.some(
+            (book) => (book.storyId ?? book.id) === activeFlow.storyId,
+          )
+        ) {
           clearCompletedFlow(activeFlow.storyId);
         }
       })
@@ -68,27 +94,57 @@ function Wizard({ booksPortalTarget }) {
   return (
     <div className="wizard">
       <div className="wizard__header">
-        <div><span className="wizard__kicker">Шаг {step} из {steps.length}</span></div>
-        <div className="step-indicator" aria-label={`Шаг ${step} из ${steps.length}`}>
+        <div>
+          <span className="wizard__kicker">
+            Шаг {step} из {steps.length}
+          </span>
+        </div>
+        <div
+          className="step-indicator"
+          aria-label={`Шаг ${step} из ${steps.length}`}
+        >
           {steps.map((item, index) => (
-            <span key={item.field} className={index < step ? 'is-active' : ''} aria-hidden="true" />
+            <span
+              key={item.field}
+              className={index < step ? "is-active" : ""}
+              aria-hidden="true"
+            />
           ))}
         </div>
       </div>
 
       <div className="step-content">
-        <StepContent currentField={current?.field} form={form} handleChange={handleChange} />
-        {submitError && <p className="generation-submit-error" role="alert">{submitError}</p>}
+        <StepContent
+          currentField={current?.field}
+          form={form}
+          handleChange={handleChange}
+        />
+        {submitError && (
+          <p className="generation-submit-error" role="alert">
+            {submitError}
+          </p>
+        )}
         {isAwaitingPayment && (
           <div className="payment-wait" role="status">
-            <p>Оплатите заказ в открывшейся вкладке. Создание сказки начнётся автоматически после подтверждения оплаты.</p>
+            <p>
+              Оплатите заказ в открывшейся вкладке. Создание сказки начнётся
+              автоматически после подтверждения оплаты.
+            </p>
             <div className="payment-wait__actions">
               {paymentConfirmationUrl && (
-                <button type="button" className="button button--secondary" onClick={handleOpenPayment}>
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={handleOpenPayment}
+                >
                   Открыть оплату
                 </button>
               )}
-              <button type="button" className="button button--secondary" onClick={handleCheckPayment}>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={handleCheckPayment}
+              >
                 Проверить оплату
               </button>
             </div>
@@ -103,28 +159,39 @@ function Wizard({ booksPortalTarget }) {
           </button>
         )}
         {step < steps.length && (
-          <button className="button button--primary" onClick={goNext} disabled={!isStepValid()}>
+          <button
+            className="button button--primary"
+            onClick={goNext}
+            disabled={!isStepValid()}
+          >
             Далее <span aria-hidden="true">→</span>
           </button>
         )}
         {step === steps.length && (
-          <button className="button button--primary" onClick={handleSubmit} disabled={!isStepValid() || isSubmitting || hasTrackedFlow}>
-            {getSubmitButtonText(paymentState, isSubmitting)} <span aria-hidden="true">✦</span>
+          <button
+            className="button button--primary"
+            onClick={handleSubmit}
+            disabled={!isStepValid() || isSubmitting || hasTrackedFlow}
+          >
+            {getSubmitButtonText(paymentState, isSubmitting)}{" "}
+            <span aria-hidden="true">✦</span>
           </button>
         )}
       </div>
 
-      {booksPortalTarget && step === 1 && createPortal(
-        <UserBooks
-          books={books}
-          isLoading={isLoading}
-          error={booksError}
-          activeFlow={activeFlow}
-          isRetrying={isSubmitting}
-          onRetry={handleRetry}
-        />,
-        booksPortalTarget,
-      )}
+      {booksPortalTarget &&
+        step === 1 &&
+        createPortal(
+          <UserBooks
+            books={books}
+            isLoading={isLoading}
+            error={booksError}
+            activeFlow={activeFlow}
+            isRetrying={isSubmitting}
+            onRetry={handleRetry}
+          />,
+          booksPortalTarget,
+        )}
     </div>
   );
 }
