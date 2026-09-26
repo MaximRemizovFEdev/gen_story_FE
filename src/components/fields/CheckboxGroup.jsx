@@ -1,6 +1,13 @@
-import React from 'react';
+import React from "react";
 
-export const CheckboxGroup = ({ label, name, value, onChange, options, max }) => {
+export const CheckboxGroup = ({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+  max,
+}) => {
   const handleChange = (event) => {
     onChange({
       target: {
@@ -16,7 +23,10 @@ export const CheckboxGroup = ({ label, name, value, onChange, options, max }) =>
       <legend>{label}</legend>
       <div className="choice-grid">
         {options.map((option) => (
-          <label className={`choice-card ${value.includes(option) ? 'is-selected' : ''}`} key={option}>
+          <label
+            className={`choice-card ${value.includes(option) ? "is-selected" : ""}`}
+            key={option}
+          >
             <input
               type="checkbox"
               name={name}

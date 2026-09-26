@@ -9,12 +9,12 @@ import AuthSuccessPage from './AuthSuccessPage';
 vi.mock('../auth/AuthContext', () => ({ useAuth: vi.fn() }));
 
 describe('authentication result pages', () => {
-  it('rechecks session and replaces success route with root', async () => {
+  it('rechecks session and replaces success route with application', async () => {
     const refreshSession = vi.fn().mockResolvedValue({ phone: null });
     useAuth.mockReturnValue({ refreshSession });
     render(<MemoryRouter initialEntries={['/auth/success']}><Routes>
       <Route path="/auth/success" element={<AuthSuccessPage />} />
-      <Route path="/" element={<p>root page</p>} />
+      <Route path="/app" element={<p>root page</p>} />
     </Routes></MemoryRouter>);
     await waitFor(() => expect(refreshSession).toHaveBeenCalled());
     expect(await screen.findByText('root page')).toBeInTheDocument();
@@ -23,6 +23,6 @@ describe('authentication result pages', () => {
   it('shows a generic auth error and retry link', () => {
     render(<MemoryRouter><AuthErrorPage /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: /авторизация не завершена/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /повторить/i })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: /повторить/i })).toHaveAttribute('href', '/auth');
   });
 });

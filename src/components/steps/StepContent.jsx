@@ -1,13 +1,19 @@
-import React from 'react';
-import { TextInput } from '../fields/TextInput';
-import { RadioGroup } from '../fields/RadioGroup';
-import { CheckboxGroup } from '../fields/CheckboxGroup';
-import { PhotoUpload } from '../fields/PhotoUpload';
-import { ageOptions, heroOptions, adventureOptions, atmosphereOptions, interestsOptions } from '../../config/options';
+import React from "react";
+import { TextInput } from "../fields/TextInput";
+import { RadioGroup } from "../fields/RadioGroup";
+import { CheckboxGroup } from "../fields/CheckboxGroup";
+import { PhotoUpload } from "../fields/PhotoUpload";
+import {
+  ageOptions,
+  heroOptions,
+  adventureOptions,
+  atmosphereOptions,
+  interestsOptions,
+} from "../../config/options";
 
 export const StepContent = ({ currentField, form, handleChange }) => {
   switch (currentField) {
-    case 'childName':
+    case "childName":
       return (
         <TextInput
           label="Имя ребенка"
@@ -19,7 +25,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           placeholder="Введите имя"
         />
       );
-    case 'ageGroup':
+    case "ageGroup":
       return (
         <RadioGroup
           label="Возраст"
@@ -29,7 +35,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           options={ageOptions}
         />
       );
-    case 'heroType':
+    case "heroType":
       return (
         <>
           <RadioGroup
@@ -39,7 +45,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
             onChange={handleChange}
             options={heroOptions}
           />
-          {form.heroType === 'Свой вариант' && (
+          {form.heroType === "Свой вариант" && (
             <TextInput
               label="Ваш вариант героя"
               name="heroCustom"
@@ -51,7 +57,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           )}
         </>
       );
-    case 'adventureGoal':
+    case "adventureGoal":
       return (
         <>
           <RadioGroup
@@ -61,7 +67,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
             onChange={handleChange}
             options={adventureOptions}
           />
-          {form.adventureGoal === 'Свой вариант' && (
+          {form.adventureGoal === "Свой вариант" && (
             <TextInput
               label="Ваш вариант приключения"
               name="adventureCustom"
@@ -73,7 +79,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           )}
         </>
       );
-    case 'storyMood':
+    case "storyMood":
       return (
         <RadioGroup
           label="Атмосфера сказки"
@@ -83,7 +89,7 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           options={atmosphereOptions}
         />
       );
-    case 'interests':
+    case "interests":
       return (
         <CheckboxGroup
           label="Интересы (максимум 3)"
@@ -94,11 +100,13 @@ export const StepContent = ({ currentField, form, handleChange }) => {
           max={3}
         />
       );
-    case 'childPhoto':
+    case "childPhoto":
       return (
         <PhotoUpload
           value={form.childPhoto}
-          onChange={(file) => handleChange({ target: { name: 'childPhoto', value: file } })}
+          onChange={(file) =>
+            handleChange({ target: { name: "childPhoto", value: file } })
+          }
         />
       );
     default:
