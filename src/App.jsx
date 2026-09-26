@@ -17,6 +17,7 @@ import AuthSuccessPage from "./pages/AuthSuccessPage";
 import AuthErrorPage from "./pages/AuthErrorPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage";
 import { AUTH_STATUS, AuthProvider, useAuth } from "./auth/AuthContext";
+import { GenerationProcessProvider } from "./hooks/GenerationProcessContext";
 
 export function RootRoute() {
   const { status } = useAuth();
@@ -50,27 +51,29 @@ export function AppRoutes() {
   return (
     <div className="site-layout">
       <div className="site-content">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/app" element={<RootRoute />} />
-          <Route path="/auth" element={<LoginRoute />} />
-          <Route
-            path="/privacy"
-            element={<LegalDocumentPage document="privacy" />}
-          />
-          <Route
-            path="/policy"
-            element={<LegalDocumentPage document="policy" />}
-          />
-          <Route
-            path="/oferta"
-            element={<LegalDocumentPage document="oferta" />}
-          />
-          <Route path="/auth/success" element={<AuthSuccessPage />} />
-          <Route path="/auth/error" element={<AuthErrorPage />} />
-          <Route path="/payment-return" element={<PaymentReturnPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+        <GenerationProcessProvider>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/app" element={<RootRoute />} />
+            <Route path="/auth" element={<LoginRoute />} />
+            <Route
+              path="/privacy"
+              element={<LegalDocumentPage document="privacy" />}
+            />
+            <Route
+              path="/policy"
+              element={<LegalDocumentPage document="policy" />}
+            />
+            <Route
+              path="/oferta"
+              element={<LegalDocumentPage document="oferta" />}
+            />
+            <Route path="/auth/success" element={<AuthSuccessPage />} />
+            <Route path="/auth/error" element={<AuthErrorPage />} />
+            <Route path="/payment-return" element={<PaymentReturnPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </GenerationProcessProvider>
       </div>
       <SiteFooter />
     </div>
