@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "../auth/AuthContext";
+import { AUTH_STATUS, useAuth } from "../auth/AuthContext";
 import apiService from "../services/ApiService";
 
 export const FLOW_STAGE = Object.freeze({
@@ -18,11 +18,20 @@ export const PAYMENT_STATE = Object.freeze({
   CHECKING: "checking",
   CREATING: "creating",
   WAITING: "waiting",
-  OPEN_BLOCKED: "open_blocked",
   GENERATING: "generating",
 });
+export const OPERATION_UI_STATE = Object.freeze({
+  IDLE: "idle",
+  RECOVERING: "recovering",
+  CHECKING_PAYMENT: "checking_payment",
+  PAYMENT_CONFIRMED: "payment_confirmed",
+  GENERATING: "generating",
+  READY: "ready",
+  ERROR: "error",
+});
 export const POLL_INTERVAL_MS = 10_000;
-export const PAYMENT_POLL_INTERVAL_MS = 3_000;
+export const OPERATION_POLL_INTERVAL_MS = 3_000;
+export const PAYMENT_POLL_INTERVAL_MS = OPERATION_POLL_INTERVAL_MS;
 
 export const prepareStoryPayload = (form) => ({
   childName: form.childName,
@@ -37,174 +46,244 @@ export const prepareStoryPayload = (form) => ({
   interests: form.interests,
 });
 
+const TERMINAL_PAYMENT_ERRORS = new Set(["canceled", "failed", "generation_failed"]);
+const GENERATION_ACTIVE = new Set(["queued", "running"]);
+
 const getErrorMessage = (error) =>
   error?.message || "Не удалось запустить создание книги";
-const delay = (ms) =>
-  new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
 
-const openPaymentWindow = (url) => {
-  if (!url || typeof window.open !== "function") return false;
-  return Boolean(window.open(url, "_blank", "noopener,noreferrer"));
+const navigateToCheckout = (url) => {
+  if (typeof window.__GEN_STORY_NAVIGATE__ === "function") {
+    window.__GEN_STORY_NAVIGATE__(url);
+    return;
+  }
+  window.location.assign(url);
+};
+
+const isReadyOperation = (operation) =>
+  operation?.paymentStatus === "consumed" &&
+  operation?.generationStatus === "success" &&
+  Boolean(operation?.storyId);
+
+const isTerminalOperationError = (operation) =>
+  operation?.generationStatus === "error" ||
+  TERMINAL_PAYMENT_ERRORS.has(operation?.paymentStatus);
+
+export const deriveOperationUiState = (operation) => {
+  if (!operation) return OPERATION_UI_STATE.IDLE;
+  if (isTerminalOperationError(operation)) return OPERATION_UI_STATE.ERROR;
+  if (isReadyOperation(operation)) return OPERATION_UI_STATE.READY;
+  if (
+    operation.storyId ||
+    GENERATION_ACTIVE.has(operation.generationStatus) ||
+    operation.paymentStatus === "reserved"
+  )
+    return OPERATION_UI_STATE.GENERATING;
+  if (operation.paymentStatus === "paid")
+    return OPERATION_UI_STATE.PAYMENT_CONFIRMED;
+  return OPERATION_UI_STATE.CHECKING_PAYMENT;
 };
 
 export const useGenerationProcess = () => {
-  const { sessionVersion } = useAuth();
+  const { status, sessionVersion } = useAuth();
+  const isAuthenticated = status === AUTH_STATUS.AUTHENTICATED;
+  const [activeOperation, setActiveOperation] = useState(null);
+  const [operationUiState, setOperationUiState] = useState(OPERATION_UI_STATE.IDLE);
   const [activeFlow, setActiveFlow] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [statusError, setStatusError] = useState(null);
   const [paymentState, setPaymentState] = useState(PAYMENT_STATE.IDLE);
   const [paymentConfirmationUrl, setPaymentConfirmationUrl] = useState("");
+  const [acceptedDraftId, setAcceptedDraftId] = useState(null);
+  const operationRef = useRef(null);
   const flowRef = useRef(null);
-  const paymentRef = useRef({
-    state: PAYMENT_STATE.IDLE,
-    confirmationUrl: "",
-    submission: null,
-  });
-  const operationRef = useRef(0);
-  const initialSessionVersion = useRef(sessionVersion);
+  const submittingRef = useRef(false);
+  const revisionRef = useRef(0);
+  const explicitRef = useRef(false);
+  const completedRefreshRef = useRef(null);
 
-  const updatePayment = useCallback((next) => {
-    paymentRef.current = { ...paymentRef.current, ...next };
-    setPaymentState(paymentRef.current.state);
-    setPaymentConfirmationUrl(paymentRef.current.confirmationUrl || "");
+  const setOperation = useCallback((operation) => {
+    operationRef.current = operation;
+    setActiveOperation(operation);
+    setOperationUiState(deriveOperationUiState(operation));
+    if (operation?.storyId) {
+      const terminal = isReadyOperation(operation);
+      const failed = isTerminalOperationError(operation);
+      const nextFlow = {
+        storyId: operation.storyId,
+        stage: terminal ? FLOW_STAGE.BOOK : FLOW_STAGE.STORY,
+        status: failed
+          ? FLOW_STATUS.ERROR
+          : terminal
+            ? FLOW_STATUS.SUCCESS
+            : FLOW_STATUS.PENDING,
+      };
+      flowRef.current = nextFlow;
+      setActiveFlow(nextFlow);
+    } else {
+      flowRef.current = null;
+      setActiveFlow(null);
+    }
   }, []);
 
-  const updateFlow = useCallback((next) => {
-    flowRef.current = typeof next === "function" ? next(flowRef.current) : next;
-    setActiveFlow(flowRef.current);
-  }, []);
-
-  const clearFlow = useCallback(() => {
-    operationRef.current += 1;
-    updateFlow(null);
-    updatePayment({
-      state: PAYMENT_STATE.IDLE,
-      confirmationUrl: "",
-      submission: null,
-    });
+  const clearSessionBoundState = useCallback(() => {
+    revisionRef.current += 1;
+    explicitRef.current = false;
+    operationRef.current = null;
+    flowRef.current = null;
+    setActiveOperation(null);
+    setActiveFlow(null);
+    setOperationUiState(OPERATION_UI_STATE.IDLE);
     setIsSubmitting(false);
+    submittingRef.current = false;
+    setIsRecovering(false);
     setSubmitError(null);
-  }, [updateFlow, updatePayment]);
+    setStatusError(null);
+    setPaymentState(PAYMENT_STATE.IDLE);
+    setPaymentConfirmationUrl("");
+    setAcceptedDraftId(null);
+    completedRefreshRef.current = null;
+  }, []);
 
   useEffect(() => {
-    if (sessionVersion !== initialSessionVersion.current) {
-      initialSessionVersion.current = sessionVersion;
-      clearFlow();
-    }
-  }, [sessionVersion, clearFlow]);
+    clearSessionBoundState();
+  }, [sessionVersion, clearSessionBoundState]);
 
-  const ensurePaid = useCallback(
-    async (submission, operationId) => {
-      const ensureCurrent = () => {
-        if (operationRef.current !== operationId) {
-          const error = new Error("Generation payment flow was cancelled");
-          error.name = "AbortError";
-          throw error;
-        }
-      };
-
-      updatePayment({ state: PAYMENT_STATE.CHECKING, submission });
-      let status = await apiService.getGenerationPaymentStatus();
-      ensureCurrent();
-      if (status?.paid) {
-        updatePayment({ state: PAYMENT_STATE.GENERATING, submission });
-        return true;
+  const readOperation = useCallback(
+    async (draftId, { explicit = false, signal } = {}) => {
+      const operation = explicit
+        ? await apiService.getGenerationOperationStatus(draftId, signal)
+        : await apiService.getCurrentGenerationOperation(signal);
+      if (operation) {
+        explicitRef.current = explicit;
+        setOperation(operation);
+        setAcceptedDraftId(operation.draftId);
+      } else if (!explicit) {
+        setOperation(null);
       }
-
-      updatePayment({ state: PAYMENT_STATE.CREATING, submission });
-      const payment = await apiService.createGenerationPayment();
-      ensureCurrent();
-      const confirmationUrl = payment?.confirmationUrl || "";
-      const opened = openPaymentWindow(confirmationUrl);
-      updatePayment({
-        state: opened ? PAYMENT_STATE.WAITING : PAYMENT_STATE.OPEN_BLOCKED,
-        confirmationUrl,
-        submission,
-      });
-
-      while (true) {
-        await delay(PAYMENT_POLL_INTERVAL_MS);
-        ensureCurrent();
-        updatePayment({
-          state: PAYMENT_STATE.WAITING,
-          confirmationUrl,
-          submission,
-        });
-        status = await apiService.getGenerationPaymentStatus();
-        ensureCurrent();
-        if (status?.paid) {
-          updatePayment({
-            state: PAYMENT_STATE.GENERATING,
-            confirmationUrl,
-            submission,
-          });
-          return true;
-        }
-      }
+      setStatusError(null);
+      return operation;
     },
-    [updatePayment],
+    [setOperation],
   );
 
+  const recoverOperation = useCallback(
+    async (draftId = null, { explicit = Boolean(draftId), signal } = {}) => {
+      if (!isAuthenticated) return null;
+      const revision = revisionRef.current;
+      setIsRecovering(true);
+      setStatusError(null);
+      setOperationUiState((current) =>
+        operationRef.current ? current : OPERATION_UI_STATE.RECOVERING,
+      );
+      try {
+        const operation = await readOperation(draftId, { explicit, signal });
+        if (revision !== revisionRef.current) return null;
+        return operation;
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        if (revision !== revisionRef.current) return null;
+        if (error?.status === 401) {
+          clearSessionBoundState();
+          throw error;
+        }
+        if (explicit && error?.status === 404) {
+          setOperation(null);
+          setOperationUiState(OPERATION_UI_STATE.ERROR);
+          setStatusError("Операция не найдена или недоступна");
+          return null;
+        }
+        setStatusError(getErrorMessage(error));
+        if (!operationRef.current) setOperationUiState(OPERATION_UI_STATE.ERROR);
+        throw error;
+      } finally {
+        if (revision === revisionRef.current) setIsRecovering(false);
+      }
+    },
+    [clearSessionBoundState, isAuthenticated, readOperation, setOperation],
+  );
+
+  useEffect(() => {
+    if (status === AUTH_STATUS.CHECKING) return undefined;
+    if (!isAuthenticated) {
+      clearSessionBoundState();
+      return undefined;
+    }
+    const controller = new AbortController();
+    recoverOperation(null, { explicit: false, signal: controller.signal }).catch(
+      (error) => {
+        if (error?.name !== "AbortError") undefined;
+      },
+    );
+    return () => controller.abort();
+  }, [status, isAuthenticated, recoverOperation, clearSessionBoundState]);
+
+  const refreshStatus = useCallback(async () => {
+    const current = operationRef.current;
+    if (current?.draftId) {
+      return recoverOperation(current.draftId, {
+        explicit: explicitRef.current,
+      }).catch(() => null);
+    }
+    return recoverOperation(null, { explicit: false }).catch(() => null);
+  }, [recoverOperation]);
+
   const submit = useCallback(
-    async (submission, replaceFailed = false) => {
-      const current = flowRef.current;
-      if (current && !(replaceFailed && current.status === FLOW_STATUS.ERROR))
+    async (submission) => {
+      if (submittingRef.current || isSubmitting || isRecovering) return null;
+      const currentState = deriveOperationUiState(operationRef.current);
+      if (
+        operationRef.current &&
+        currentState !== OPERATION_UI_STATE.READY &&
+        currentState !== OPERATION_UI_STATE.ERROR
+      )
         return null;
 
-      const operationId = operationRef.current + 1;
-      operationRef.current = operationId;
+      const revision = revisionRef.current + 1;
+      revisionRef.current = revision;
+      submittingRef.current = true;
       setIsSubmitting(true);
       setSubmitError(null);
+      setStatusError(null);
+      setPaymentState(PAYMENT_STATE.CHECKING);
       try {
-        await ensurePaid(submission, operationId);
-        let response;
-        try {
-          response = await apiService.startGenerationFlow(
-            submission.questionnaire,
-            submission.childPhoto,
-          );
-        } catch (error) {
-          if (error?.status !== 402) throw error;
-          await ensurePaid(submission, operationId);
-          response = await apiService.startGenerationFlow(
-            submission.questionnaire,
-            submission.childPhoto,
-          );
-        }
-        if (response?.status !== FLOW_STATUS.PENDING || !response?.storyId) {
-          throw new Error(
-            "Сервер вернул некорректный ответ при запуске генерации",
-          );
-        }
-        updateFlow({
-          storyId: response.storyId,
-          stage: FLOW_STAGE.STORY,
-          status: FLOW_STATUS.PENDING,
-          submission,
-        });
-        updatePayment({
-          state: PAYMENT_STATE.IDLE,
-          confirmationUrl: "",
-          submission: null,
-        });
-        return response;
+        const draft = await apiService.createGenerationDraft(
+          submission.questionnaire,
+          submission.childPhoto,
+        );
+        if (revision !== revisionRef.current) return null;
+        setAcceptedDraftId(draft.draftId);
+        setPaymentState(PAYMENT_STATE.CREATING);
+        const payment = await apiService.createGenerationPayment(draft.draftId);
+        if (revision !== revisionRef.current) return null;
+        setPaymentConfirmationUrl(payment.confirmationUrl);
+        setPaymentState(PAYMENT_STATE.WAITING);
+        navigateToCheckout(payment.confirmationUrl);
+        return { draftId: draft.draftId, payment };
       } catch (error) {
         if (error?.name !== "AbortError" && error?.status !== 401)
           setSubmitError(getErrorMessage(error));
-        if (error?.status === 401)
-          updatePayment({
-            state: PAYMENT_STATE.IDLE,
-            confirmationUrl: "",
-            submission: null,
-          });
+        if (acceptedDraftId || operationRef.current?.draftId) {
+          refreshStatus();
+        }
+        if (error?.status === 401) clearSessionBoundState();
         throw error;
       } finally {
-        if (operationRef.current === operationId) setIsSubmitting(false);
+        if (revision === revisionRef.current) {
+          submittingRef.current = false;
+          setIsSubmitting(false);
+        }
       }
     },
-    [ensurePaid, updateFlow, updatePayment],
+    [
+      acceptedDraftId,
+      clearSessionBoundState,
+      isRecovering,
+      isSubmitting,
+      refreshStatus,
+    ],
   );
 
   const startGeneration = useCallback(
@@ -216,42 +295,72 @@ export const useGenerationProcess = () => {
     [submit],
   );
 
-  const retryGeneration = useCallback(() => {
-    const current = flowRef.current;
-    if (!current?.submission || current.status !== FLOW_STATUS.ERROR)
-      return Promise.resolve(null);
-    return submit(current.submission, true);
-  }, [submit]);
-
-  const reopenPayment = useCallback(() => {
-    const url = paymentRef.current.confirmationUrl;
-    if (!url) return false;
-    const opened = openPaymentWindow(url);
-    updatePayment({
-      state: opened ? PAYMENT_STATE.WAITING : PAYMENT_STATE.OPEN_BLOCKED,
-    });
-    return opened;
-  }, [updatePayment]);
-
-  const checkPaymentStatus = useCallback(async () => {
-    const current = paymentRef.current;
-    if (!current.submission) return null;
-    updatePayment({ state: PAYMENT_STATE.CHECKING });
-    const status = await apiService.getGenerationPaymentStatus();
-    updatePayment({
-      state: status?.paid ? PAYMENT_STATE.GENERATING : PAYMENT_STATE.WAITING,
-    });
-    return status;
-  }, [updatePayment]);
+  const retryGeneration = useCallback(() => refreshStatus(), [refreshStatus]);
+  const reopenPayment = useCallback(() => false, []);
+  const checkPaymentStatus = useCallback(() => refreshStatus(), [refreshStatus]);
 
   const storyId = activeFlow?.storyId;
-  const isTerminal =
+  const isTerminalFlow =
     activeFlow?.status === FLOW_STATUS.ERROR ||
     (activeFlow?.stage === FLOW_STAGE.BOOK &&
       activeFlow?.status === FLOW_STATUS.SUCCESS);
+  const shouldPollOperation =
+    Boolean(activeOperation?.draftId) &&
+    !isReadyOperation(activeOperation) &&
+    !isTerminalOperationError(activeOperation) &&
+    !activeOperation.storyId;
 
   useEffect(() => {
-    if (!storyId || isTerminal) return undefined;
+    if (!isAuthenticated || !shouldPollOperation) return undefined;
+    const controller = new AbortController();
+    let timerId;
+    let disposed = false;
+    const draftId = activeOperation.draftId;
+    const explicit = explicitRef.current;
+
+    const poll = async () => {
+      try {
+        const operation = await apiService.getGenerationOperationStatus(
+          draftId,
+          controller.signal,
+        );
+        if (disposed || operation?.draftId !== draftId) return;
+        setOperation(operation);
+        setStatusError(null);
+        if (isReadyOperation(operation) || isTerminalOperationError(operation))
+          return;
+      } catch (error) {
+        if (disposed || error?.name === "AbortError") return;
+        if (error?.status === 401) {
+          clearSessionBoundState();
+          return;
+        }
+        if (explicit && error?.status === 404) {
+          setOperationUiState(OPERATION_UI_STATE.ERROR);
+          setStatusError("Операция не найдена или недоступна");
+          return;
+        }
+        setStatusError(getErrorMessage(error));
+      }
+      if (!disposed) timerId = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS);
+    };
+
+    poll();
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (timerId) window.clearTimeout(timerId);
+    };
+  }, [
+    activeOperation,
+    clearSessionBoundState,
+    isAuthenticated,
+    setOperation,
+    shouldPollOperation,
+  ]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !storyId || isTerminalFlow) return undefined;
 
     const controller = new AbortController();
     let timerId;
@@ -264,23 +373,31 @@ export const useGenerationProcess = () => {
           controller.signal,
         );
         if (disposed || result?.storyId !== storyId) return;
-        updateFlow((current) =>
-          current?.storyId === storyId
-            ? { ...current, stage: result.stage, status: result.status }
-            : current,
-        );
-        if (
-          result.status === FLOW_STATUS.ERROR ||
-          (result.stage === FLOW_STAGE.BOOK &&
-            result.status === FLOW_STATUS.SUCCESS)
-        )
+        const nextFlow = {
+          storyId,
+          stage: result.stage,
+          status: result.status,
+        };
+        flowRef.current = nextFlow;
+        setActiveFlow(nextFlow);
+        if (result.status === FLOW_STATUS.ERROR) {
+          setOperationUiState(OPERATION_UI_STATE.ERROR);
           return;
+        }
+        if (
+          result.stage === FLOW_STAGE.BOOK &&
+          result.status === FLOW_STATUS.SUCCESS
+        ) {
+          setOperationUiState(OPERATION_UI_STATE.READY);
+          return;
+        }
       } catch (error) {
         if (disposed || error?.name === "AbortError") return;
         if (error?.status === 401) {
-          clearFlow();
+          clearSessionBoundState();
           return;
         }
+        setStatusError(getErrorMessage(error));
       }
       if (!disposed) timerId = window.setTimeout(poll, POLL_INTERVAL_MS);
     };
@@ -291,49 +408,65 @@ export const useGenerationProcess = () => {
       controller.abort();
       if (timerId) window.clearTimeout(timerId);
     };
-  }, [storyId, isTerminal, updateFlow, clearFlow]);
+  }, [clearSessionBoundState, isAuthenticated, isTerminalFlow, storyId]);
 
-  const clearCompletedFlow = useCallback(
-    (completedStoryId) => {
-      const current = flowRef.current;
-      if (
-        current?.storyId === completedStoryId &&
-        current.stage === FLOW_STAGE.BOOK &&
-        current.status === FLOW_STATUS.SUCCESS
-      )
-        clearFlow();
-    },
-    [clearFlow],
-  );
+  const clearCompletedFlow = useCallback((completedStoryId) => {
+    const current = flowRef.current;
+    if (
+      current?.storyId === completedStoryId &&
+      current.stage === FLOW_STAGE.BOOK &&
+      current.status === FLOW_STATUS.SUCCESS
+    ) {
+      flowRef.current = null;
+      setActiveFlow(null);
+    }
+  }, []);
 
   return useMemo(
     () => ({
       activeFlow,
+      activeOperation,
+      operationUiState,
+      isRecovering,
+      isRecoveryPending:
+        status === AUTH_STATUS.CHECKING ||
+        (isAuthenticated && isRecovering && !activeOperation),
       isSubmitting,
       submitError,
-      hasTrackedFlow: Boolean(activeFlow),
+      statusError,
+      hasTrackedFlow: Boolean(activeFlow || activeOperation),
       startGeneration,
       retryGeneration,
+      refreshStatus,
+      recoverOperation,
       clearCompletedFlow,
       paymentState,
       paymentConfirmationUrl,
-      isAwaitingPayment:
-        paymentState === PAYMENT_STATE.WAITING ||
-        paymentState === PAYMENT_STATE.OPEN_BLOCKED,
+      acceptedDraftId,
+      isAwaitingPayment: false,
       reopenPayment,
       checkPaymentStatus,
     }),
     [
+      acceptedDraftId,
       activeFlow,
-      isSubmitting,
-      submitError,
-      startGeneration,
-      retryGeneration,
-      clearCompletedFlow,
-      paymentState,
-      paymentConfirmationUrl,
-      reopenPayment,
+      activeOperation,
       checkPaymentStatus,
+      clearCompletedFlow,
+      isAuthenticated,
+      isRecovering,
+      isSubmitting,
+      operationUiState,
+      paymentConfirmationUrl,
+      paymentState,
+      recoverOperation,
+      refreshStatus,
+      reopenPayment,
+      retryGeneration,
+      startGeneration,
+      status,
+      statusError,
+      submitError,
     ],
   );
 };

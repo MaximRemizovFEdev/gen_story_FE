@@ -3,7 +3,7 @@ import apiService from "../../services/ApiService";
 import { SceneEditorModal } from "./SceneEditorModal";
 
 const STAGE_LABELS = {
-  story: "Создаём историю",
+  story: "Создаем историю",
   cover: "Рисуем обложку",
   scenes: "Готовим иллюстрации",
   book: "Собираем книгу",
@@ -37,13 +37,13 @@ const FlowPlaceholder = ({ flow, isRetrying, onRetry }) => {
           ? "Не удалось создать книгу"
           : complete
             ? "Книга готова"
-            : "Ваша книга создаётся"}
+            : "Ваша книга создается"}
       </h3>
       <p className="user-book__flow-stage">
         {failed
           ? `Ошибка на этапе: ${STAGE_LABELS[flow.stage] || flow.stage}`
           : complete
-            ? "Обновляем библиотеку…"
+            ? "Обновляем библиотеку..."
             : STAGE_LABELS[flow.stage]}
       </p>
       <small>Номер: {flow.storyId}</small>
@@ -54,7 +54,7 @@ const FlowPlaceholder = ({ flow, isRetrying, onRetry }) => {
           onClick={onRetry}
           disabled={isRetrying}
         >
-          {isRetrying ? "Запускаем снова…" : "Попробовать снова"}
+          {isRetrying ? "Обновляем..." : "Обновить статус"}
         </button>
       )}
     </article>
@@ -71,6 +71,10 @@ export const UserBooks = ({
 }) => {
   const [editingBook, setEditingBook] = useState(null);
   const [resourceError, setResourceError] = useState("");
+  const flowStoryId = activeFlow?.storyId || null;
+  const visibleBooks = flowStoryId
+    ? books.filter((book) => (book.storyId ?? book.id) !== flowStoryId)
+    : books;
 
   const handleDownload = async (event, storyId, title) => {
     event.preventDefault();
@@ -93,11 +97,11 @@ export const UserBooks = ({
     }
   };
 
-  if (isLoading && !activeFlow && !books.length)
+  if (isLoading && !activeFlow && !visibleBooks.length)
     return <p className="user-books-status">Загружаем ваши книги...</p>;
-  if (error && !activeFlow && !books.length)
+  if (error && !activeFlow && !visibleBooks.length)
     return <p className="user-books-error">{error}</p>;
-  if (!books.length && !activeFlow) return null;
+  if (!visibleBooks.length && !activeFlow) return null;
 
   return (
     <section className="user-books" id="user-books">
@@ -116,7 +120,7 @@ export const UserBooks = ({
             onRetry={onRetry}
           />
         )}
-        {books.map((book) => {
+        {visibleBooks.map((book) => {
           const storyId = book.storyId ?? book.id;
           return (
             <article
@@ -160,7 +164,7 @@ export const UserBooks = ({
           );
         })}
       </div>
-      {isLoading && <p className="user-books-status">Обновляем библиотеку…</p>}
+      {isLoading && <p className="user-books-status">Обновляем библиотеку...</p>}
       {error && (
         <p className="user-books-error" role="alert">
           {error}

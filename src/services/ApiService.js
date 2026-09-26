@@ -87,47 +87,122 @@ class ApiService {
     );
   }
 
-  getGenerationPaymentStatus() {
-    return this.request(
-      "/payments/generation/status",
-      {
-        headers: { Accept: "application/json" },
-      },
-      "Не удалось проверить статус оплаты",
-    );
+  async createGenerationDraft(questionnaire, childPhoto) {
+    const response = !childPhoto
+      ? await this.request(
+          "/generation-drafts",
+          {
+            method: "POST",
+            body: JSON.stringify(questionnaire),
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+          },
+          "Не удалось сохранить анкету перед оплатой",
+        )
+      : await this.request(
+          "/generation-drafts",
+          {
+            method: "POST",
+            body: this.createStoryFormData(questionnaire, childPhoto),
+            headers: { Accept: "application/json" },
+          },
+          "Не удалось сохранить анкету и фото перед оплатой",
+        );
+    if (!response?.draftId || typeof response.draftId !== "string") {
+      throw new Error("Сервер не вернул draftId для оплаты");
+    }
+    return response;
   }
 
-  createGenerationPayment() {
-    return this.request(
+  async createGenerationPayment(draftId) {
+    if (!draftId || typeof draftId !== "string") {
+      throw new Error("Не найден draftId для создания платежа");
+    }
+    const payment = await this.request(
       "/payments/generation/create",
       {
         method: "POST",
-        headers: { Accept: "application/json" },
+        body: JSON.stringify({ draftId }),
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
       },
       "Не удалось создать платеж",
     );
+    if (
+      !payment?.confirmationUrl ||
+      typeof payment.confirmationUrl !== "string" ||
+      !/^https?:\/\//i.test(payment.confirmationUrl)
+    ) {
+      throw new Error("Сервер не вернул ссылку на оплату");
+    }
+    return payment;
   }
 
-  startGenerationFlow(questionnaire, childPhoto) {
-    if (!childPhoto) {
-      return this.request(
-        "/generate-flow",
-        {
-          method: "POST",
-          body: JSON.stringify(questionnaire),
-          headers: { "Content-Type": "application/json" },
-        },
-        "Не удалось создать сказку. Проверьте данные анкеты",
-      );
-    }
+  createStoryFormData(questionnaire, childPhoto) {
     const body = new FormData();
     body.append("formData", JSON.stringify(questionnaire));
     body.append("childPhoto", childPhoto);
-    return this.request(
-      "/generate-flow",
-      { method: "POST", body },
-      "Не удалось запустить создание книги. Проверьте данные анкеты и фотографию",
+    return body;
+  }
+
+  normalizeGenerationOperation(operation) {
+    if (operation === null) return null;
+    if (
+      !operation ||
+      typeof operation.draftId !== "string" ||
+      !operation.draftId ||
+      typeof operation.paymentStatus !== "string" ||
+      typeof operation.generationStatus !== "string"
+    ) {
+      throw new Error("Сервер вернул некорректный статус операции");
+    }
+    return {
+      draftId: operation.draftId,
+      paymentStatus: operation.paymentStatus,
+      generationStatus: operation.generationStatus,
+      storyId:
+        typeof operation.storyId === "string" && operation.storyId
+          ? operation.storyId
+          : null,
+      error:
+        typeof operation.error === "string" && operation.error
+          ? operation.error
+          : null,
+    };
+  }
+
+  async getGenerationOperationStatus(draftId, signal) {
+    if (!draftId || typeof draftId !== "string") {
+      throw new Error("Не найден draftId для проверки статуса");
+    }
+    const operation = await this.request(
+      `/generation-drafts/${encodeURIComponent(draftId)}/status`,
+      {
+        headers: { Accept: "application/json" },
+        signal,
+      },
+      "Не удалось проверить статус операции",
     );
+    return this.normalizeGenerationOperation(operation);
+  }
+
+  async getCurrentGenerationOperation(signal) {
+    const response = await this.request(
+      "/payments/generation/current",
+      {
+        headers: { Accept: "application/json" },
+        signal,
+      },
+      "Не удалось восстановить текущую операцию",
+    );
+    if (!response || !Object.prototype.hasOwnProperty.call(response, "operation")) {
+      throw new Error("Сервер вернул некорректный ответ восстановления");
+    }
+    return this.normalizeGenerationOperation(response.operation);
   }
 
   getGenerationFlowStatus(storyId, signal) {

@@ -1,10 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useWizardForm } from "../hooks/useWizardForm";
-import {
-  PAYMENT_STATE,
-  useGenerationProcess,
-} from "../hooks/useGenerationProcess";
+import { PAYMENT_STATE } from "../hooks/useGenerationProcess";
+import { useGenerationProcessContext } from "../hooks/GenerationProcessContext";
 import { StepContent } from "./steps/StepContent";
 import { UserBooks } from "./books/UserBooks";
 import { steps } from "../config/steps";
@@ -13,14 +11,10 @@ import { useAuth } from "../auth/AuthContext";
 
 const getSubmitButtonText = (paymentState, isSubmitting) => {
   if (!isSubmitting) return "Создать мою сказку";
-  if (paymentState === PAYMENT_STATE.CHECKING) return "Проверяем оплату…";
-  if (paymentState === PAYMENT_STATE.CREATING) return "Готовим оплату…";
-  if (
-    paymentState === PAYMENT_STATE.WAITING ||
-    paymentState === PAYMENT_STATE.OPEN_BLOCKED
-  )
-    return "Ждём оплату…";
-  return "Запускаем создание…";
+  if (paymentState === PAYMENT_STATE.CHECKING) return "Сохраняем анкету...";
+  if (paymentState === PAYMENT_STATE.CREATING) return "Готовим оплату...";
+  if (paymentState === PAYMENT_STATE.WAITING) return "Переходим к оплате...";
+  return "Готовим создание...";
 };
 
 function Wizard({ booksPortalTarget }) {
@@ -38,17 +32,14 @@ function Wizard({ booksPortalTarget }) {
   const {
     activeFlow,
     isSubmitting,
+    isRecoveryPending,
     submitError,
     hasTrackedFlow,
     paymentState,
-    paymentConfirmationUrl,
-    isAwaitingPayment,
     startGeneration,
     retryGeneration,
     clearCompletedFlow,
-    reopenPayment,
-    checkPaymentStatus,
-  } = useGenerationProcess();
+  } = useGenerationProcessContext();
   const {
     books,
     isLoading,
@@ -78,18 +69,13 @@ function Wizard({ booksPortalTarget }) {
   const handleSubmit = async () => {
     try {
       const response = await startGeneration(form);
-      if (response) {
-        reset();
-        reloadBooks().catch(() => undefined);
-      }
+      if (response) reset();
     } catch {
       // Submission errors are exposed by the hook; the completed form stays intact.
     }
   };
 
   const handleRetry = () => retryGeneration().catch(() => undefined);
-  const handleOpenPayment = () => reopenPayment();
-  const handleCheckPayment = () => checkPaymentStatus().catch(() => undefined);
 
   return (
     <div className="wizard">
@@ -124,31 +110,10 @@ function Wizard({ booksPortalTarget }) {
             {submitError}
           </p>
         )}
-        {isAwaitingPayment && (
-          <div className="payment-wait" role="status">
-            <p>
-              Оплатите заказ в открывшейся вкладке. Создание сказки начнётся
-              автоматически после подтверждения оплаты.
-            </p>
-            <div className="payment-wait__actions">
-              {paymentConfirmationUrl && (
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={handleOpenPayment}
-                >
-                  Открыть оплату
-                </button>
-              )}
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={handleCheckPayment}
-              >
-                Проверить оплату
-              </button>
-            </div>
-          </div>
+        {isRecoveryPending && (
+          <p className="generation-submit-error" role="status">
+            Восстанавливаем текущую операцию...
+          </p>
         )}
       </div>
 
@@ -171,7 +136,7 @@ function Wizard({ booksPortalTarget }) {
           <button
             className="button button--primary"
             onClick={handleSubmit}
-            disabled={!isStepValid() || isSubmitting || hasTrackedFlow}
+            disabled={!isStepValid() || isSubmitting || isRecoveryPending || hasTrackedFlow}
           >
             {getSubmitButtonText(paymentState, isSubmitting)}{" "}
             <span aria-hidden="true">✦</span>

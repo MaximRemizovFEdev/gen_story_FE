@@ -97,10 +97,11 @@ describe('public and protected routes', () => {
     checkFooter();
   });
   it('shows footer on authentication errors', () => { open('/auth/error'); checkFooter(); });
-  it('shows an informational payment return page without opening the protected app', () => {
+  it('shows a read-only payment return page without opening the protected app', () => {
     open('/payment-return');
-    expect(screen.getByRole('heading', { name: 'Оплата завершена' })).toBeInTheDocument();
-    expect(screen.getByText(/Вернитесь во вкладку создания сказки/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ищем операцию' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Обновить статус' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'В библиотеку' })).toHaveAttribute('href', '/app');
     expect(screen.queryByText('protected application')).not.toBeInTheDocument();
     checkFooter();
   });
