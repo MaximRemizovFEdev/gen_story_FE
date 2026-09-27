@@ -121,7 +121,7 @@ export default function PaymentReturnPage() {
           >
             Обновить статус
           </button>
-          <Link className="button button--primary" to="/app">
+          <Link className="button button--primary pad" to="/app">
             В библиотеку
           </Link>
         </div>
