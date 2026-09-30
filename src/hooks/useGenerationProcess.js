@@ -101,6 +101,7 @@ export const useGenerationProcess = () => {
   const flowRef = useRef(null);
   const submittingRef = useRef(false);
   const revisionRef = useRef(0);
+  const operationRequestRef = useRef(0);
   const explicitRef = useRef(false);
   const completedRefreshRef = useRef(null);
 
@@ -130,6 +131,7 @@ export const useGenerationProcess = () => {
 
   const clearSessionBoundState = useCallback(() => {
     revisionRef.current += 1;
+    operationRequestRef.current += 1;
     explicitRef.current = false;
     operationRef.current = null;
     flowRef.current = null;
@@ -152,10 +154,11 @@ export const useGenerationProcess = () => {
   }, [sessionVersion, clearSessionBoundState]);
 
   const readOperation = useCallback(
-    async (draftId, { explicit = false, signal } = {}) => {
+    async (draftId, { explicit = false, signal, requestId } = {}) => {
       const operation = explicit
         ? await apiService.getGenerationOperationStatus(draftId, signal)
         : await apiService.getCurrentGenerationOperation(signal);
+      if (requestId && requestId !== operationRequestRef.current) return null;
       if (operation) {
         explicitRef.current = explicit;
         setOperation(operation);
@@ -173,18 +176,31 @@ export const useGenerationProcess = () => {
     async (draftId = null, { explicit = Boolean(draftId), signal } = {}) => {
       if (!isAuthenticated) return null;
       const revision = revisionRef.current;
+      const requestId = operationRequestRef.current;
       setIsRecovering(true);
       setStatusError(null);
       setOperationUiState((current) =>
         operationRef.current ? current : OPERATION_UI_STATE.RECOVERING,
       );
       try {
-        const operation = await readOperation(draftId, { explicit, signal });
-        if (revision !== revisionRef.current) return null;
+        const operation = await readOperation(draftId, {
+          explicit,
+          signal,
+          requestId,
+        });
+        if (
+          revision !== revisionRef.current ||
+          requestId !== operationRequestRef.current
+        )
+          return null;
         return operation;
       } catch (error) {
         if (error?.name === "AbortError") throw error;
-        if (revision !== revisionRef.current) return null;
+        if (
+          revision !== revisionRef.current ||
+          requestId !== operationRequestRef.current
+        )
+          return null;
         if (error?.status === 401) {
           clearSessionBoundState();
           throw error;
@@ -199,10 +215,58 @@ export const useGenerationProcess = () => {
         if (!operationRef.current) setOperationUiState(OPERATION_UI_STATE.ERROR);
         throw error;
       } finally {
-        if (revision === revisionRef.current) setIsRecovering(false);
+        if (
+          revision === revisionRef.current &&
+          requestId === operationRequestRef.current
+        )
+          setIsRecovering(false);
       }
     },
     [clearSessionBoundState, isAuthenticated, readOperation, setOperation],
+  );
+
+  const checkNewSubmissionPermission = useCallback(
+    async ({ signal } = {}) => {
+      if (!isAuthenticated) return null;
+      const revision = revisionRef.current;
+      const requestId = operationRequestRef.current + 1;
+      operationRequestRef.current = requestId;
+      setStatusError(null);
+      try {
+        const operation = await apiService.getCurrentGenerationOperation(signal);
+        if (
+          revision !== revisionRef.current ||
+          requestId !== operationRequestRef.current
+        )
+          return null;
+        explicitRef.current = false;
+        setOperation(operation);
+        if (operation) setAcceptedDraftId(operation.draftId);
+        else {
+          setAcceptedDraftId(null);
+          setPaymentConfirmationUrl("");
+          setPaymentState(PAYMENT_STATE.IDLE);
+          completedRefreshRef.current = null;
+        }
+        setStatusError(null);
+        return operation;
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        if (
+          revision !== revisionRef.current ||
+          requestId !== operationRequestRef.current
+        )
+          return null;
+        if (error?.status === 401) {
+          clearSessionBoundState();
+          throw error;
+        }
+        setStatusError(getErrorMessage(error));
+        if (!operationRef.current) setOperationUiState(OPERATION_UI_STATE.ERROR);
+        throw error;
+      }
+    },
+    [clearSessionBoundState, isAuthenticated, setOperation],
   );
 
   useEffect(() => {
@@ -317,6 +381,7 @@ export const useGenerationProcess = () => {
     let disposed = false;
     const draftId = activeOperation.draftId;
     const explicit = explicitRef.current;
+    const requestId = operationRequestRef.current;
 
     const poll = async () => {
       try {
@@ -324,13 +389,23 @@ export const useGenerationProcess = () => {
           draftId,
           controller.signal,
         );
-        if (disposed || operation?.draftId !== draftId) return;
+        if (
+          disposed ||
+          requestId !== operationRequestRef.current ||
+          operation?.draftId !== draftId
+        )
+          return;
         setOperation(operation);
         setStatusError(null);
         if (isReadyOperation(operation) || isTerminalOperationError(operation))
           return;
       } catch (error) {
-        if (disposed || error?.name === "AbortError") return;
+        if (
+          disposed ||
+          requestId !== operationRequestRef.current ||
+          error?.name === "AbortError"
+        )
+          return;
         if (error?.status === 401) {
           clearSessionBoundState();
           return;
@@ -365,6 +440,7 @@ export const useGenerationProcess = () => {
     const controller = new AbortController();
     let timerId;
     let disposed = false;
+    const requestId = operationRequestRef.current;
 
     const poll = async () => {
       try {
@@ -372,7 +448,12 @@ export const useGenerationProcess = () => {
           storyId,
           controller.signal,
         );
-        if (disposed || result?.storyId !== storyId) return;
+        if (
+          disposed ||
+          requestId !== operationRequestRef.current ||
+          result?.storyId !== storyId
+        )
+          return;
         const nextFlow = {
           storyId,
           stage: result.stage,
@@ -392,7 +473,12 @@ export const useGenerationProcess = () => {
           return;
         }
       } catch (error) {
-        if (disposed || error?.name === "AbortError") return;
+        if (
+          disposed ||
+          requestId !== operationRequestRef.current ||
+          error?.name === "AbortError"
+        )
+          return;
         if (error?.status === 401) {
           clearSessionBoundState();
           return;
@@ -439,6 +525,7 @@ export const useGenerationProcess = () => {
       retryGeneration,
       refreshStatus,
       recoverOperation,
+      checkNewSubmissionPermission,
       clearCompletedFlow,
       paymentState,
       paymentConfirmationUrl,
@@ -452,6 +539,7 @@ export const useGenerationProcess = () => {
       activeFlow,
       activeOperation,
       checkPaymentStatus,
+      checkNewSubmissionPermission,
       clearCompletedFlow,
       isAuthenticated,
       isRecovering,
