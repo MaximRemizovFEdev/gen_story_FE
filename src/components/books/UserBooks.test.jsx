@@ -8,6 +8,7 @@ vi.mock("../../services/ApiService", () => ({
   default: {
     getCoverUrl: vi.fn((id) => `/api/stories/${id}/cover`),
     getBookDownloadUrl: vi.fn((id) => `/api/books/${id}/download`),
+    getStoryBook: vi.fn(),
     downloadBook: vi.fn(),
   },
 }));
@@ -20,6 +21,12 @@ const book = {
 
 describe("UserBooks", () => {
   beforeEach(() => {
+    apiService.getStoryBook.mockResolvedValue({
+      storyId: book.storyId,
+      title: book.title,
+      cover: { imageUrl: `/api/stories/${book.storyId}/cover` },
+      scenes: [],
+    });
     apiService.downloadBook.mockResolvedValue(new Blob(["pdf"]));
     URL.createObjectURL = vi.fn(() => "blob:book");
     URL.revokeObjectURL = vi.fn();
@@ -78,6 +85,7 @@ describe("UserBooks", () => {
     const placeholder = screen.getByTestId("generation-placeholder");
     expect(placeholder).toHaveTextContent(label);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /читать книгу/i })).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /редактировать/i }),
     ).not.toBeInTheDocument();
@@ -110,5 +118,52 @@ describe("UserBooks", () => {
     );
     expect(screen.getByTestId("generation-placeholder")).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("opens reading through /book without downloading PDF", async () => {
+    render(<UserBooks books={[book]} isLoading={false} error={null} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /читать книгу/i }));
+
+    expect(apiService.downloadBook).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(apiService.getStoryBook).toHaveBeenCalledWith(
+        book.storyId,
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+  });
+
+  it("keeps PDF download independent from reading", async () => {
+    render(<UserBooks books={[book]} isLoading={false} error={null} />);
+    fireEvent.click(screen.getByRole("link"));
+
+    await waitFor(() => expect(apiService.downloadBook).toHaveBeenCalledWith(book.storyId));
+    expect(apiService.getStoryBook).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("reopens with a fresh request and updated content on the cover", async () => {
+    render(<UserBooks books={[book]} isLoading={false} error={null} />);
+    const opener = screen.getByRole("button", { name: /читать книгу/i });
+    opener.focus();
+    fireEvent.click(opener);
+    await screen.findByText("1 / 1");
+    fireEvent.click(screen.getByRole("button", { name: /закрыть просмотр/i }));
+    expect(opener).toHaveFocus();
+    apiService.getStoryBook.mockResolvedValueOnce({
+      storyId: book.storyId, title: "Updated", cover: { imageUrl: "/new-cover" }, scenes: [],
+    });
+    fireEvent.click(opener);
+    expect(await screen.findByRole("heading", { name: "Updated" })).toBeInTheDocument();
+    expect(apiService.getStoryBook).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+  });
+
+  it("does not offer reading without a story id", () => {
+    render(<UserBooks books={[{ ...book, storyId: undefined }]} isLoading={false} error={null} />);
+    expect(screen.queryByRole("button", { name: /читать книгу/i })).not.toBeInTheDocument();
   });
 });

@@ -228,4 +228,113 @@ describe("ApiService", () => {
       "/api/stories/12-34_28-08-2026/scenes",
     ]);
   });
+
+  it("loads story books through the JSON viewer contract", async () => {
+    const controller = new AbortController();
+    fetch.mockResolvedValue(
+      jsonResponse({
+        storyId: "story/with space",
+        title: "Viewer book",
+        cover: { imageUrl: "/api/stories/story%2Fwith%20space/cover" },
+        scenes: [
+          {
+            sceneId: 10,
+            imageUrl: "/api/stories/story/scenes/10/image",
+            text: "Scene ten",
+          },
+          {
+            sceneId: "2",
+            imageUrl: "/api/stories/story/scenes/2/image",
+            text: "Scene two",
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      service.getStoryBook("story/with space", controller.signal),
+    ).resolves.toEqual({
+      storyId: "story/with space",
+      title: "Viewer book",
+      cover: { imageUrl: "/api/stories/story%2Fwith%20space/cover" },
+      scenes: [
+        {
+          sceneId: "10",
+          imageUrl: "/api/stories/story/scenes/10/image",
+          text: "Scene ten",
+        },
+        {
+          sceneId: "2",
+          imageUrl: "/api/stories/story/scenes/2/image",
+          text: "Scene two",
+        },
+      ],
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/stories/story%2Fwith%20space/book",
+      expect.objectContaining({
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      }),
+    );
+  });
+
+  it("accepts an empty story book scene list and rejects malformed books", async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse({
+        storyId: "story-1",
+        title: "Cover only",
+        cover: { imageUrl: "/api/stories/story-1/cover" },
+        scenes: [],
+      }),
+    );
+    await expect(service.getStoryBook("story-1")).resolves.toMatchObject({
+      scenes: [],
+    });
+
+    fetch.mockResolvedValueOnce(jsonResponse({ storyId: "story-1" }));
+    await expect(service.getStoryBook("story-1")).rejects.toThrow(
+      /некорректную книгу/i,
+    );
+
+    fetch.mockResolvedValueOnce(
+      jsonResponse({
+        storyId: "story-1",
+        title: "Bad scene",
+        cover: { imageUrl: "/api/stories/story-1/cover" },
+        scenes: [{ sceneId: 1, imageUrl: "/api/image" }],
+      }),
+    );
+    await expect(service.getStoryBook("story-1")).rejects.toThrow(
+      /некорректную сцену/i,
+    );
+  });
+
+  it("keeps book request failures and global auth handling consistent", async () => {
+    const handler = vi.fn();
+    service.setUnauthorizedHandler(handler);
+    fetch.mockResolvedValueOnce(jsonResponse({ error: "missing" }, 404));
+    await expect(service.getStoryBook("story-1")).rejects.toMatchObject({
+      status: 404,
+      endpoint: "/stories/story-1/book",
+    });
+    expect(handler).not.toHaveBeenCalled();
+
+    fetch.mockRejectedValueOnce(Object.assign(new Error("offline"), { name: "TypeError" }));
+    await expect(service.getStoryBook("story-1")).rejects.toMatchObject({
+      endpoint: "/stories/story-1/book",
+    });
+
+    fetch.mockRejectedValueOnce(Object.assign(new Error("cancelled"), { name: "AbortError" }));
+    await expect(service.getStoryBook("story-1")).rejects.toMatchObject({
+      name: "AbortError",
+    });
+
+    fetch.mockResolvedValueOnce(jsonResponse({ error: "AUTH_REQUIRED" }, 401));
+    await expect(service.getStoryBook("story-1")).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
 });

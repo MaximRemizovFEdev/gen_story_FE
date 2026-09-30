@@ -270,4 +270,129 @@ describe("useGenerationProcess", () => {
     expect(result.current.operationUiState).toBe(OPERATION_UI_STATE.ERROR);
     expect(result.current.activeOperation).toBeNull();
   });
+
+  it("clears tracked operation and flow when new submission check returns null", async () => {
+    apiService.getCurrentGenerationOperation
+      .mockResolvedValueOnce(
+        operation({
+          paymentStatus: "consumed",
+          generationStatus: "success",
+          storyId: "12-34_25-09-2026",
+        }),
+      )
+      .mockResolvedValueOnce(null);
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    expect(result.current.hasTrackedFlow).toBe(true);
+
+    await act(async () => {
+      await result.current.checkNewSubmissionPermission();
+    });
+
+    expect(result.current.activeOperation).toBeNull();
+    expect(result.current.activeFlow).toBeNull();
+    expect(result.current.hasTrackedFlow).toBe(false);
+  });
+
+  it("keeps create blocked when new submission check returns any operation status", async () => {
+    apiService.getCurrentGenerationOperation
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        operation({
+          paymentStatus: "failed",
+          generationStatus: "error",
+          error: "failed",
+        }),
+      );
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+
+    await act(async () => {
+      await result.current.checkNewSubmissionPermission();
+    });
+
+    expect(result.current.activeOperation).toMatchObject({
+      draftId: "draft-1",
+      paymentStatus: "failed",
+      generationStatus: "error",
+    });
+    expect(result.current.hasTrackedFlow).toBe(true);
+    expect(result.current.operationUiState).toBe(OPERATION_UI_STATE.ERROR);
+  });
+
+  it("distinguishes check errors from a successful null and clears state on 401", async () => {
+    apiService.getCurrentGenerationOperation
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("network"))
+      .mockRejectedValueOnce(Object.assign(new Error("expired"), { status: 401 }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+
+    await act(async () => {
+      await expect(result.current.checkNewSubmissionPermission()).rejects.toThrow(
+        "network",
+      );
+    });
+    expect(result.current.statusError).toBe("network");
+
+    await act(async () => {
+      await expect(result.current.checkNewSubmissionPermission()).rejects.toThrow(
+        "expired",
+      );
+    });
+    expect(result.current.activeOperation).toBeNull();
+    expect(result.current.hasTrackedFlow).toBe(false);
+  });
+
+  it("ignores outdated polling writes after an authoritative current null check", async () => {
+    let resolvePoll;
+    apiService.getCurrentGenerationOperation
+      .mockResolvedValueOnce(
+        operation({ paymentStatus: "paid", generationStatus: "not_started" }),
+      )
+      .mockResolvedValueOnce(null);
+    apiService.getGenerationOperationStatus.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePoll = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    expect(result.current.activeOperation).toMatchObject({ draftId: "draft-1" });
+
+    await act(async () => {
+      await result.current.checkNewSubmissionPermission();
+    });
+    expect(result.current.activeOperation).toBeNull();
+
+    await act(async () => {
+      resolvePoll(operation({ paymentStatus: "reserved", generationStatus: "running" }));
+      await Promise.resolve();
+    });
+
+    expect(result.current.activeOperation).toBeNull();
+    expect(result.current.hasTrackedFlow).toBe(false);
+  });
+
+  it("preserves explicit payment return lookup behavior", async () => {
+    apiService.getCurrentGenerationOperation.mockResolvedValueOnce(null);
+    apiService.getGenerationOperationStatus.mockResolvedValueOnce(
+      operation({ draftId: "return-draft", paymentStatus: "reserved" }),
+    );
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+
+    await act(async () => {
+      await result.current.recoverOperation("return-draft", { explicit: true });
+    });
+
+    expect(apiService.getGenerationOperationStatus).toHaveBeenCalledWith(
+      "return-draft",
+      undefined,
+    );
+    expect(result.current.activeOperation).toMatchObject({
+      draftId: "return-draft",
+      paymentStatus: "reserved",
+    });
+  });
 });

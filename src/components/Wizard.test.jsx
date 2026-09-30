@@ -28,6 +28,7 @@ const generationState = (overrides = {}) => ({
   paymentState: "idle",
   startGeneration: vi.fn(),
   retryGeneration: vi.fn(),
+  checkNewSubmissionPermission: vi.fn().mockResolvedValue(null),
   clearCompletedFlow: vi.fn(),
   ...overrides,
 });
@@ -35,12 +36,14 @@ const generationState = (overrides = {}) => ({
 describe("Wizard flow submission", () => {
   let reset;
   let startGeneration;
+  let checkNewSubmissionPermission;
   let reload;
 
   beforeEach(() => {
     reset = vi.fn();
     reload = vi.fn().mockResolvedValue([]);
     startGeneration = vi.fn().mockResolvedValue({ draftId: "draft-1" });
+    checkNewSubmissionPermission = vi.fn().mockResolvedValue(null);
     useWizardForm.mockReturnValue({
       step: 7,
       form,
@@ -51,7 +54,9 @@ describe("Wizard flow submission", () => {
       goNext: vi.fn(),
       reset,
     });
-    useGenerationProcessContext.mockReturnValue(generationState({ startGeneration }));
+    useGenerationProcessContext.mockReturnValue(
+      generationState({ startGeneration, checkNewSubmissionPermission }),
+    );
     useUserBooks.mockReturnValue({
       books: [],
       isLoading: false,
@@ -62,6 +67,9 @@ describe("Wizard flow submission", () => {
 
   it("resets the questionnaire only after checkout preparation is accepted", async () => {
     render(<Wizard />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: /создать мою сказку/i }));
     await waitFor(() => expect(startGeneration).toHaveBeenCalledWith(form));
     expect(reset).toHaveBeenCalledTimes(1);
@@ -76,6 +84,9 @@ describe("Wizard flow submission", () => {
       }),
     );
     render(<Wizard />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: /создать мою сказку/i }));
     await waitFor(() => expect(startGeneration).toHaveBeenCalled());
     expect(reset).not.toHaveBeenCalled();
@@ -123,9 +134,7 @@ describe("Wizard flow submission", () => {
       }),
     );
     render(<Wizard />);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /восстанавливаем текущую операцию/i,
-    );
+    expect(screen.getByText(/восстанавливаем текущую операцию/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeDisabled();
   });
 
@@ -144,5 +153,104 @@ describe("Wizard flow submission", () => {
     expect(screen.queryByRole("button", { name: /открыть оплату/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /проверить оплату/i })).not.toBeInTheDocument();
     expect(reset).not.toHaveBeenCalled();
+  });
+
+  it("checks current operation on every photo step entry and blocks while pending", async () => {
+    let resolveFirst;
+    checkNewSubmissionPermission.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
+    const goBack = vi.fn();
+    const goNext = vi.fn();
+    useWizardForm.mockReturnValue({
+      step: 7,
+      form,
+      current: { field: "childPhoto" },
+      handleChange: vi.fn(),
+      isStepValid: () => true,
+      goBack,
+      goNext,
+      reset,
+    });
+
+    const { rerender } = render(<Wizard />);
+
+    expect(checkNewSubmissionPermission).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /проверяем возможность создания/i,
+    );
+    expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeDisabled();
+
+    await waitFor(() => expect(resolveFirst).toBeDefined());
+    resolveFirst(null);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeEnabled(),
+    );
+
+    useWizardForm.mockReturnValue({
+      step: 6,
+      form,
+      current: { field: "interests" },
+      handleChange: vi.fn(),
+      isStepValid: () => true,
+      goBack,
+      goNext,
+      reset,
+    });
+    rerender(<Wizard />);
+
+    useWizardForm.mockReturnValue({
+      step: 7,
+      form,
+      current: { field: "childPhoto" },
+      handleChange: vi.fn(),
+      isStepValid: () => true,
+      goBack,
+      goNext,
+      reset,
+    });
+    rerender(<Wizard />);
+
+    expect(checkNewSubmissionPermission).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeDisabled();
+  });
+
+  it("keeps create blocked on check error and unlocks after retry returns null", async () => {
+    checkNewSubmissionPermission
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce(null);
+
+    render(<Wizard />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /не удалось проверить возможность создания/i,
+      ),
+    );
+    expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /повторить проверку/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeEnabled(),
+    );
+    expect(checkNewSubmissionPermission).toHaveBeenCalledTimes(2);
+    expect(startGeneration).not.toHaveBeenCalled();
+  });
+
+  it("does not submit on an allowed check and submits once after the user clicks", async () => {
+    render(<Wizard />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeEnabled(),
+    );
+    expect(startGeneration).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /создать мою сказку/i }));
+
+    await waitFor(() => expect(startGeneration).toHaveBeenCalledTimes(1));
+    expect(startGeneration).toHaveBeenCalledWith(form);
   });
 });

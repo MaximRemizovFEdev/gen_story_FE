@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import apiService from "../../services/ApiService";
+import { BookViewer } from "./BookViewer";
 import { SceneEditorModal } from "./SceneEditorModal";
 
 const STAGE_LABELS = {
@@ -70,7 +71,9 @@ export const UserBooks = ({
   onRetry = () => undefined,
 }) => {
   const [editingBook, setEditingBook] = useState(null);
+  const [readingBook, setReadingBook] = useState(null);
   const [resourceError, setResourceError] = useState("");
+  const closeViewer = useCallback(() => setReadingBook(null), []);
   const flowStoryId = activeFlow?.storyId || null;
   const visibleBooks = flowStoryId
     ? books.filter((book) => (book.storyId ?? book.id) !== flowStoryId)
@@ -152,13 +155,23 @@ export const UserBooks = ({
               <time dateTime={book.generatedAt}>
                 {formatGeneratedAt(book.generatedAt)}
               </time>
+              {storyId && <button
+                type="button"
+                className="user-book__read"
+                onClick={() => {
+                  setResourceError("");
+                  setReadingBook({ ...book, storyId });
+                }}
+              >
+                Читать книгу
+              </button>}
               <a
                 href={apiService.getBookDownloadUrl(storyId)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(event) => handleDownload(event, storyId, book.title)}
               >
-                Скачать
+                Скачать PDF
               </a>
             </article>
           );
@@ -179,6 +192,13 @@ export const UserBooks = ({
         <SceneEditorModal
           book={editingBook}
           onClose={() => setEditingBook(null)}
+        />
+      )}
+      {readingBook && (
+        <BookViewer
+          storyId={readingBook.storyId}
+          title={readingBook.title}
+          onClose={closeViewer}
         />
       )}
     </section>

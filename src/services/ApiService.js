@@ -244,6 +244,48 @@ class ApiService {
     );
   }
 
+  async getStoryBook(storyId, signal) {
+    const result = await this.request(
+      `/stories/${encodeURIComponent(storyId)}/book`,
+      { headers: { Accept: "application/json" }, signal },
+      "Не удалось загрузить книгу",
+    );
+
+    if (
+      !result ||
+      typeof result.storyId !== "string" ||
+      typeof result.title !== "string" ||
+      !result.cover ||
+      typeof result.cover.imageUrl !== "string" ||
+      !Array.isArray(result.scenes)
+    ) {
+      throw new Error("Сервер вернул некорректную книгу");
+    }
+
+    return {
+      storyId: result.storyId,
+      title: result.title,
+      cover: {
+        imageUrl: this.getFileUrl(result.cover.imageUrl),
+      },
+      scenes: result.scenes.map((scene) => {
+        if (
+          !scene ||
+          !Object.prototype.hasOwnProperty.call(scene, "sceneId") ||
+          typeof scene.imageUrl !== "string" ||
+          typeof scene.text !== "string"
+        ) {
+          throw new Error("Сервер вернул некорректную сцену книги");
+        }
+        return {
+          sceneId: String(scene.sceneId),
+          imageUrl: this.getFileUrl(scene.imageUrl),
+          text: scene.text,
+        };
+      }),
+    };
+  }
+
   updateStoryScenes(storyId, scenes) {
     return this.request(
       `/stories/${encodeURIComponent(storyId)}/scenes`,
