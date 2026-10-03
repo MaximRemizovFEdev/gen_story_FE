@@ -48,14 +48,14 @@ const FlowPlaceholder = ({ flow, isRetrying, onRetry }) => {
             : STAGE_LABELS[flow.stage]}
       </p>
       <small>Номер: {flow.storyId}</small>
-      {failed && (
+      {(failed || complete) && (
         <button
           type="button"
           className="button button--primary user-book__retry"
           onClick={onRetry}
           disabled={isRetrying}
         >
-          {isRetrying ? "Обновляем..." : "Обновить статус"}
+          {isRetrying ? "Обновляем..." : complete ? "Обновить библиотеку" : "Обновить статус"}
         </button>
       )}
     </article>
@@ -74,7 +74,12 @@ export const UserBooks = ({
   const [readingBook, setReadingBook] = useState(null);
   const [resourceError, setResourceError] = useState("");
   const closeViewer = useCallback(() => setReadingBook(null), []);
-  const flowStoryId = activeFlow?.storyId || null;
+  const displayedFlow =
+    activeFlow?.stage === "book" && activeFlow?.status === "success" &&
+    books.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)
+      ? null
+      : activeFlow;
+  const flowStoryId = displayedFlow?.storyId || null;
   const visibleBooks = flowStoryId
     ? books.filter((book) => (book.storyId ?? book.id) !== flowStoryId)
     : books;
@@ -116,9 +121,9 @@ export const UserBooks = ({
         <p>Готовые истории и текущий процесс создания книги находятся здесь.</p>
       </div>
       <div className="user-books-list">
-        {activeFlow && (
+        {displayedFlow && (
           <FlowPlaceholder
-            flow={activeFlow}
+            flow={displayedFlow}
             isRetrying={isRetrying}
             onRetry={onRetry}
           />

@@ -49,3 +49,12 @@ Frontend states:
 - Consumed and generation-failed operations remain discoverable after draft/photo cleanup.
 - Payment-create uncertainty is reconciled by read-only status calls. The frontend does not automatically repeat payment creation.
 - `PAYMENT_RETURN_URL` is a backend deployment setting pointing at the frontend `/payment-return` route.
+
+## New checkout after a finished purchase
+
+- Each visit to the photo step performs a fresh read-only current-operation check. Pending checks, check failures, invalid responses, and unknown purchase states keep submission disabled; retry repeats only the read. Inputs and photo remain intact.
+- A successful `operation: null` response or `paymentStatus` of `consumed`, `generation_failed`, `canceled`, or `failed` permits a new checkout. Consumed entitlement permits it even if the previous story failed.
+- `not_created`, `pending`, `paid`, and `reserved` remain blocking regardless of generation success/error. Button state and submission guard share this rule.
+- A new user-initiated checkout creates a new draft and payment. Discovery never reuses an old entitlement or retries generation.
+- A listed ready book takes precedence over the same completed flow placeholder, including repeated photo-step discovery. A missing book can be reloaded with “Обновить библиотеку”; reconciliation does not block a permitted checkout.
+- This supersedes the null-only permission rule recorded in archived change `2026-10-03-recheck-generation-on-photo-step`. That archive documents historical behavior. Persistent history of multiple failed stories remains outside this frontend fix.

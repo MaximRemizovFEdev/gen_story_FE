@@ -116,8 +116,9 @@ describe("UserBooks", () => {
         activeFlow={{ storyId: book.storyId, stage: "book", status: "success" }}
       />,
     );
-    expect(screen.getByTestId("generation-placeholder")).toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("generation-placeholder")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /читать книгу/i })).toBeEnabled();
   });
 
   it("opens reading through /book without downloading PDF", async () => {

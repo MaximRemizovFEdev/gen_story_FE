@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useWizardForm } from "../hooks/useWizardForm";
-import { PAYMENT_STATE } from "../hooks/useGenerationProcess";
+import { allowsNewGeneration, PAYMENT_STATE } from "../hooks/useGenerationProcess";
 import { useGenerationProcessContext } from "../hooks/GenerationProcessContext";
 import { StepContent } from "./steps/StepContent";
 import { UserBooks } from "./books/UserBooks";
@@ -42,7 +42,7 @@ function Wizard({ booksPortalTarget }) {
     isSubmitting,
     isRecoveryPending,
     submitError,
-    hasTrackedFlow,
+    activeOperation,
     paymentState,
     startGeneration,
     retryGeneration,
@@ -70,9 +70,9 @@ function Wizard({ booksPortalTarget }) {
         const operation = await checkNewSubmissionPermission({ signal });
         if (signal?.aborted || visitId !== photoCheckVisitRef.current) return;
         setPhotoPermissionState(
-          operation
-            ? PHOTO_PERMISSION_STATE.BLOCKED
-            : PHOTO_PERMISSION_STATE.ALLOWED,
+          allowsNewGeneration(operation)
+            ? PHOTO_PERMISSION_STATE.ALLOWED
+            : PHOTO_PERMISSION_STATE.BLOCKED,
         );
       } catch (error) {
         if (error?.name === "AbortError") return;
@@ -103,6 +103,10 @@ function Wizard({ booksPortalTarget }) {
   useEffect(() => {
     if (activeFlow?.stage !== "book" || activeFlow?.status !== "success")
       return;
+    if (books.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)) {
+      clearCompletedFlow(activeFlow.storyId);
+      return;
+    }
     if (completionRefreshRef.current === activeFlow.storyId) return;
     completionRefreshRef.current = activeFlow.storyId;
     reloadBooks()
@@ -116,9 +120,13 @@ function Wizard({ booksPortalTarget }) {
         }
       })
       .catch(() => undefined);
-  }, [activeFlow, reloadBooks, clearCompletedFlow]);
+  }, [activeFlow, books, reloadBooks, clearCompletedFlow]);
 
   const handleSubmit = async () => {
+    if (
+      isPhotoPermissionBlocked || !isStepValid() || isSubmitting ||
+      isRecoveryPending || !allowsNewGeneration(activeOperation)
+    ) return;
     try {
       const response = await startGeneration(form);
       if (response) reset();
@@ -127,7 +135,13 @@ function Wizard({ booksPortalTarget }) {
     }
   };
 
-  const handleRetry = () => retryGeneration().catch(() => undefined);
+  const handleRetry = () => {
+    if (activeFlow?.stage === "book" && activeFlow?.status === "success") {
+      reloadBooks().catch(() => undefined);
+    } else {
+      retryGeneration().catch(() => undefined);
+    }
+  };
   const handlePhotoPermissionRetry = () => {
     const controller = new AbortController();
     runPhotoPermissionCheck(controller.signal);
@@ -222,7 +236,7 @@ function Wizard({ booksPortalTarget }) {
               !isStepValid() ||
               isSubmitting ||
               isRecoveryPending ||
-              hasTrackedFlow ||
+              !allowsNewGeneration(activeOperation) ||
               isPhotoPermissionBlocked
             }
           >
@@ -239,7 +253,7 @@ function Wizard({ booksPortalTarget }) {
             isLoading={isLoading}
             error={booksError}
             activeFlow={activeFlow}
-            isRetrying={isSubmitting}
+            isRetrying={isSubmitting || isLoading}
             onRetry={handleRetry}
           />,
           booksPortalTarget,

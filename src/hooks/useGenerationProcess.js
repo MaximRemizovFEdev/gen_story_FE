@@ -48,6 +48,12 @@ export const prepareStoryPayload = (form) => ({
 
 const TERMINAL_PAYMENT_ERRORS = new Set(["canceled", "failed", "generation_failed"]);
 const GENERATION_ACTIVE = new Set(["queued", "running"]);
+const FINISHED_PURCHASES = new Set([
+  "consumed", "generation_failed", "canceled", "failed",
+]);
+
+export const allowsNewGeneration = (operation) =>
+  operation === null || FINISHED_PURCHASES.has(operation?.paymentStatus);
 
 const getErrorMessage = (error) =>
   error?.message || "Не удалось запустить создание книги";
@@ -100,6 +106,7 @@ export const useGenerationProcess = () => {
   const operationRef = useRef(null);
   const flowRef = useRef(null);
   const submittingRef = useRef(false);
+  const permissionCheckRef = useRef(null);
   const revisionRef = useRef(0);
   const operationRequestRef = useRef(0);
   const explicitRef = useRef(false);
@@ -140,6 +147,7 @@ export const useGenerationProcess = () => {
     setOperationUiState(OPERATION_UI_STATE.IDLE);
     setIsSubmitting(false);
     submittingRef.current = false;
+    permissionCheckRef.current = null;
     setIsRecovering(false);
     setSubmitError(null);
     setStatusError(null);
@@ -158,7 +166,7 @@ export const useGenerationProcess = () => {
       const operation = explicit
         ? await apiService.getGenerationOperationStatus(draftId, signal)
         : await apiService.getCurrentGenerationOperation(signal);
-      if (requestId && requestId !== operationRequestRef.current) return null;
+      if (signal?.aborted || requestId !== operationRequestRef.current) return null;
       if (operation) {
         explicitRef.current = explicit;
         setOperation(operation);
@@ -231,14 +239,17 @@ export const useGenerationProcess = () => {
       const revision = revisionRef.current;
       const requestId = operationRequestRef.current + 1;
       operationRequestRef.current = requestId;
+      permissionCheckRef.current = requestId;
+      setIsRecovering(false);
       setStatusError(null);
       try {
         const operation = await apiService.getCurrentGenerationOperation(signal);
         if (
+          signal?.aborted ||
           revision !== revisionRef.current ||
           requestId !== operationRequestRef.current
         )
-          return null;
+          return undefined;
         explicitRef.current = false;
         setOperation(operation);
         if (operation) setAcceptedDraftId(operation.draftId);
@@ -253,10 +264,11 @@ export const useGenerationProcess = () => {
       } catch (error) {
         if (error?.name === "AbortError") throw error;
         if (
+          signal?.aborted ||
           revision !== revisionRef.current ||
           requestId !== operationRequestRef.current
         )
-          return null;
+          return undefined;
         if (error?.status === 401) {
           clearSessionBoundState();
           throw error;
@@ -264,6 +276,8 @@ export const useGenerationProcess = () => {
         setStatusError(getErrorMessage(error));
         if (!operationRef.current) setOperationUiState(OPERATION_UI_STATE.ERROR);
         throw error;
+      } finally {
+        if (permissionCheckRef.current === requestId) permissionCheckRef.current = null;
       }
     },
     [clearSessionBoundState, isAuthenticated, setOperation],
@@ -296,17 +310,15 @@ export const useGenerationProcess = () => {
 
   const submit = useCallback(
     async (submission) => {
-      if (submittingRef.current || isSubmitting || isRecovering) return null;
-      const currentState = deriveOperationUiState(operationRef.current);
       if (
-        operationRef.current &&
-        currentState !== OPERATION_UI_STATE.READY &&
-        currentState !== OPERATION_UI_STATE.ERROR
-      )
-        return null;
+        submittingRef.current || permissionCheckRef.current !== null ||
+        isSubmitting || isRecovering || !isAuthenticated || statusError ||
+        !allowsNewGeneration(operationRef.current)
+      ) return null;
 
       const revision = revisionRef.current + 1;
       revisionRef.current = revision;
+      operationRequestRef.current += 1;
       submittingRef.current = true;
       setIsSubmitting(true);
       setSubmitError(null);
@@ -327,6 +339,7 @@ export const useGenerationProcess = () => {
         navigateToCheckout(payment.confirmationUrl);
         return { draftId: draft.draftId, payment };
       } catch (error) {
+        if (revision !== revisionRef.current) return null;
         if (error?.name !== "AbortError" && error?.status !== 401)
           setSubmitError(getErrorMessage(error));
         if (acceptedDraftId || operationRef.current?.draftId) {
@@ -344,6 +357,8 @@ export const useGenerationProcess = () => {
     [
       acceptedDraftId,
       clearSessionBoundState,
+      isAuthenticated,
+      statusError,
       isRecovering,
       isSubmitting,
       refreshStatus,
