@@ -21,6 +21,7 @@ const form = { childName: "Миша", childPhoto: null };
 
 const generationState = (overrides = {}) => ({
   activeFlow: null,
+  activeOperation: null,
   isSubmitting: false,
   isRecoveryPending: false,
   submitError: null,
