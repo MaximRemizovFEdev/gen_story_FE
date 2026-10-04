@@ -4,7 +4,7 @@ export const service = Object.freeze({
   fullName: 'Ремизов Максим Сергеевич',
   inn: '623009423005',
   status: 'Самозанятый (НПД)',
-  email: 'webreznov@mail.ru',
+  email: 'webreznow@vk.com',
   phone: '8 910 562-97-08',
   phoneHref: '+79105629708',
 });

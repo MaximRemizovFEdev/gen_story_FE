@@ -23,7 +23,7 @@ function checkFooter() {
   const footer = within(screen.getByRole('contentinfo'));
   expect(footer.getByText(/623009423005/)).toBeInTheDocument();
   expect(footer.getByText('Ремизов Максим Сергеевич')).toBeInTheDocument();
-  expect(footer.getByRole('link', { name: 'webreznov@mail.ru' })).toHaveAttribute('href', 'mailto:webreznov@mail.ru');
+  expect(footer.getByRole('link', { name: 'webreznow@vk.com' })).toHaveAttribute('href', 'mailto:webreznow@vk.com');
   expect(footer.getByRole('link', { name: '8 910 562-97-08' })).toHaveAttribute('href', 'tel:+79105629708');
   expect(footer.getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(expect.arrayContaining(['/privacy', '/policy', '/oferta']));
 }
