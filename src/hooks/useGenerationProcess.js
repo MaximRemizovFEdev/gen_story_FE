@@ -53,7 +53,8 @@ const FINISHED_PURCHASES = new Set([
 ]);
 
 export const allowsNewGeneration = (operation) =>
-  operation === null || FINISHED_PURCHASES.has(operation?.paymentStatus);
+  operation === null || FINISHED_PURCHASES.has(operation?.paymentStatus) ||
+  (operation?.paymentStatus === "pending" && operation?.generationStatus === "not_started");
 
 const getErrorMessage = (error) =>
   error?.message || "Не удалось запустить создание книги";
@@ -111,6 +112,19 @@ export const useGenerationProcess = () => {
   const operationRequestRef = useRef(0);
   const explicitRef = useRef(false);
   const completedRefreshRef = useRef(null);
+  const [trackingVersion, setTrackingVersion] = useState(0);
+  const [isCheckingPermission, setIsCheckingPermission] = useState(false);
+  const stopOperationPollRef = useRef(null);
+  const stopStoryPollRef = useRef(null);
+  // Non-null after a new attempt: refresh must never fall back to its predecessor.
+  const attemptRef = useRef(null);
+  const invalidateTracking = useCallback(() => {
+    operationRequestRef.current += 1;
+    stopOperationPollRef.current?.();
+    stopStoryPollRef.current?.();
+    setTrackingVersion(operationRequestRef.current);
+    return operationRequestRef.current;
+  }, []);
 
   const setOperation = useCallback((operation) => {
     operationRef.current = operation;
@@ -138,7 +152,9 @@ export const useGenerationProcess = () => {
 
   const clearSessionBoundState = useCallback(() => {
     revisionRef.current += 1;
-    operationRequestRef.current += 1;
+    invalidateTracking();
+    attemptRef.current = null;
+    setIsCheckingPermission(false);
     explicitRef.current = false;
     operationRef.current = null;
     flowRef.current = null;
@@ -155,7 +171,7 @@ export const useGenerationProcess = () => {
     setPaymentConfirmationUrl("");
     setAcceptedDraftId(null);
     completedRefreshRef.current = null;
-  }, []);
+  }, [invalidateTracking]);
 
   useEffect(() => {
     clearSessionBoundState();
@@ -183,8 +199,9 @@ export const useGenerationProcess = () => {
   const recoverOperation = useCallback(
     async (draftId = null, { explicit = Boolean(draftId), signal } = {}) => {
       if (!isAuthenticated) return null;
+      if (attemptRef.current && (!explicit || draftId !== attemptRef.current.draftId)) return null;
       const revision = revisionRef.current;
-      const requestId = operationRequestRef.current;
+      const requestId = invalidateTracking();
       setIsRecovering(true);
       setStatusError(null);
       setOperationUiState((current) =>
@@ -230,27 +247,30 @@ export const useGenerationProcess = () => {
           setIsRecovering(false);
       }
     },
-    [clearSessionBoundState, isAuthenticated, readOperation, setOperation],
+    [clearSessionBoundState, invalidateTracking, isAuthenticated, readOperation, setOperation],
   );
 
   const checkNewSubmissionPermission = useCallback(
     async ({ signal } = {}) => {
-      if (!isAuthenticated) return null;
+      if (!isAuthenticated || submittingRef.current) return undefined;
       const revision = revisionRef.current;
-      const requestId = operationRequestRef.current + 1;
-      operationRequestRef.current = requestId;
+      const requestId = invalidateTracking();
+      setIsCheckingPermission(true);
       permissionCheckRef.current = requestId;
       setIsRecovering(false);
       setStatusError(null);
       try {
-        const operation = await apiService.getCurrentGenerationOperation(signal);
+        const uncertainDraftId = attemptRef.current?.draftId;
+        const operation = uncertainDraftId
+          ? await apiService.getGenerationOperationStatus(uncertainDraftId, signal)
+          : await apiService.getCurrentGenerationOperation(signal);
         if (
           signal?.aborted ||
           revision !== revisionRef.current ||
           requestId !== operationRequestRef.current
         )
           return undefined;
-        explicitRef.current = false;
+        explicitRef.current = Boolean(uncertainDraftId);
         setOperation(operation);
         if (operation) setAcceptedDraftId(operation.draftId);
         else {
@@ -277,10 +297,13 @@ export const useGenerationProcess = () => {
         if (!operationRef.current) setOperationUiState(OPERATION_UI_STATE.ERROR);
         throw error;
       } finally {
-        if (permissionCheckRef.current === requestId) permissionCheckRef.current = null;
+        if (permissionCheckRef.current === requestId) {
+          permissionCheckRef.current = null;
+          setIsCheckingPermission(false);
+        }
       }
     },
-    [clearSessionBoundState, isAuthenticated, setOperation],
+    [clearSessionBoundState, invalidateTracking, isAuthenticated, setOperation],
   );
 
   useEffect(() => {
@@ -299,6 +322,11 @@ export const useGenerationProcess = () => {
   }, [status, isAuthenticated, recoverOperation, clearSessionBoundState]);
 
   const refreshStatus = useCallback(async () => {
+    if (submittingRef.current) return null;
+    if (attemptRef.current) {
+      const draftId = attemptRef.current.draftId;
+      return draftId ? recoverOperation(draftId, { explicit: true }).catch(() => null) : null;
+    }
     const current = operationRef.current;
     if (current?.draftId) {
       return recoverOperation(current.draftId, {
@@ -318,19 +346,27 @@ export const useGenerationProcess = () => {
 
       const revision = revisionRef.current + 1;
       revisionRef.current = revision;
-      operationRequestRef.current += 1;
+      invalidateTracking();
+      attemptRef.current = { draftId: null };
+      setOperation(null);
+      setAcceptedDraftId(null);
+      setPaymentConfirmationUrl("");
+      explicitRef.current = true;
       submittingRef.current = true;
       setIsSubmitting(true);
       setSubmitError(null);
       setStatusError(null);
       setPaymentState(PAYMENT_STATE.CHECKING);
+      let newDraftId = null;
       try {
         const draft = await apiService.createGenerationDraft(
           submission.questionnaire,
           submission.childPhoto,
         );
         if (revision !== revisionRef.current) return null;
-        setAcceptedDraftId(draft.draftId);
+        newDraftId = draft.draftId;
+        attemptRef.current = { draftId: newDraftId };
+        setAcceptedDraftId(newDraftId);
         setPaymentState(PAYMENT_STATE.CREATING);
         const payment = await apiService.createGenerationPayment(draft.draftId);
         if (revision !== revisionRef.current) return null;
@@ -342,8 +378,8 @@ export const useGenerationProcess = () => {
         if (revision !== revisionRef.current) return null;
         if (error?.name !== "AbortError" && error?.status !== 401)
           setSubmitError(getErrorMessage(error));
-        if (acceptedDraftId || operationRef.current?.draftId) {
-          refreshStatus();
+        if (newDraftId && error?.status !== 401) {
+          await recoverOperation(newDraftId, { explicit: true }).catch(() => null);
         }
         if (error?.status === 401) clearSessionBoundState();
         throw error;
@@ -355,13 +391,14 @@ export const useGenerationProcess = () => {
       }
     },
     [
-      acceptedDraftId,
       clearSessionBoundState,
+      invalidateTracking,
+      setOperation,
       isAuthenticated,
       statusError,
       isRecovering,
       isSubmitting,
-      refreshStatus,
+      recoverOperation,
     ],
   );
 
@@ -383,6 +420,8 @@ export const useGenerationProcess = () => {
     activeFlow?.status === FLOW_STATUS.ERROR ||
     (activeFlow?.stage === FLOW_STAGE.BOOK &&
       activeFlow?.status === FLOW_STATUS.SUCCESS);
+  const operationDraftId = activeOperation?.draftId;
+  const trackingPaused = isSubmitting || isCheckingPermission || isRecovering;
   const shouldPollOperation =
     Boolean(activeOperation?.draftId) &&
     !isReadyOperation(activeOperation) &&
@@ -390,11 +429,11 @@ export const useGenerationProcess = () => {
     !activeOperation.storyId;
 
   useEffect(() => {
-    if (!isAuthenticated || !shouldPollOperation) return undefined;
+    if (!isAuthenticated || trackingPaused || !shouldPollOperation) return undefined;
     const controller = new AbortController();
     let timerId;
     let disposed = false;
-    const draftId = activeOperation.draftId;
+    const draftId = operationDraftId;
     const explicit = explicitRef.current;
     const requestId = operationRequestRef.current;
 
@@ -435,14 +474,18 @@ export const useGenerationProcess = () => {
       if (!disposed) timerId = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS);
     };
 
-    poll();
-    return () => {
+    const stop = () => {
       disposed = true;
       controller.abort();
       if (timerId) window.clearTimeout(timerId);
     };
+    stopOperationPollRef.current = stop;
+    poll();
+    return stop;
   }, [
-    activeOperation,
+    operationDraftId,
+    trackingVersion,
+    trackingPaused,
     clearSessionBoundState,
     isAuthenticated,
     setOperation,
@@ -450,7 +493,7 @@ export const useGenerationProcess = () => {
   ]);
 
   useEffect(() => {
-    if (!isAuthenticated || !storyId || isTerminalFlow) return undefined;
+    if (!isAuthenticated || trackingPaused || !storyId || isTerminalFlow) return undefined;
 
     const controller = new AbortController();
     let timerId;
@@ -503,13 +546,15 @@ export const useGenerationProcess = () => {
       if (!disposed) timerId = window.setTimeout(poll, POLL_INTERVAL_MS);
     };
 
-    poll();
-    return () => {
+    const stop = () => {
       disposed = true;
       controller.abort();
       if (timerId) window.clearTimeout(timerId);
     };
-  }, [clearSessionBoundState, isAuthenticated, isTerminalFlow, storyId]);
+    stopStoryPollRef.current = stop;
+    poll();
+    return stop;
+  }, [clearSessionBoundState, isAuthenticated, isTerminalFlow, storyId, trackingVersion, trackingPaused]);
 
   const clearCompletedFlow = useCallback((completedStoryId) => {
     const current = flowRef.current;

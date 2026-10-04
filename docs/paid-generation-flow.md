@@ -50,11 +50,19 @@ Frontend states:
 - Payment-create uncertainty is reconciled by read-only status calls. The frontend does not automatically repeat payment creation.
 - `PAYMENT_RETURN_URL` is a backend deployment setting pointing at the frontend `/payment-return` route.
 
-## New checkout after a finished purchase
+## New checkout after a finished or unpaid purchase
 
 - Each visit to the photo step performs a fresh read-only current-operation check. Pending checks, check failures, invalid responses, and unknown purchase states keep submission disabled; retry repeats only the read. Inputs and photo remain intact.
 - A successful `operation: null` response or `paymentStatus` of `consumed`, `generation_failed`, `canceled`, or `failed` permits a new checkout. Consumed entitlement permits it even if the previous story failed.
-- `not_created`, `pending`, `paid`, and `reserved` remain blocking regardless of generation success/error. Button state and submission guard share this rule.
+- The exact combination `pending / not_started` also permits a new user-initiated checkout. `not_created`, `paid`, `reserved`, unknown states, and `pending` with any other generation status remain blocking. Button state and submission guard share this rule.
 - A new user-initiated checkout creates a new draft and payment. Discovery never reuses an old entitlement or retries generation.
 - A listed ready book takes precedence over the same completed flow placeholder, including repeated photo-step discovery. A missing book can be reloaded with “Обновить библиотеку”; reconciliation does not block a permitted checkout.
 - This supersedes the null-only permission rule recorded in archived change `2026-10-03-recheck-generation-on-photo-step`. That archive documents historical behavior. Persistent history of multiple failed stories remains outside this frontend fix.
+
+## Polling and replacement checkout
+
+- Operation status reads use one sequential automatic polling chain per selected draftId. The first automatic read starts on tracking; subsequent reads wait 3000 ms after the previous request settles. Fresh response objects and pending-to-paid transitions do not reset the timer. Slow requests never overlap within that chain.
+- Explicit recovery and photo-step checks supersede the previous tracking generation and resume one chain for the selected operation. Terminal results, story allocation, logout and disposal stop operation polling; story progress retains its 10-second interval.
+- Accepting a new submission cancels the previous poll before creating a fresh draft and payment. Late old responses cannot restore the old operation. Duplicate clicks while submission is in progress do not create another checkout.
+- Draft-creation failure keeps the form/photo and does not automatically resume discovery or old polling. After a new draft is accepted, uncertain payment creation and read-only retries target only that new draftId, including 404 and transient failures; they never fall back to the old checkout or repeat POST automatically. While this attempt remains tracked, permission rechecks use its explicit status rather than discovery of a previous payment.
+- Detaching local tracking does not cancel the old provider payment. Its URL may remain payable. On reload, normal server discovery may return that old pending operation; pending/not_started still permits a new attempt.

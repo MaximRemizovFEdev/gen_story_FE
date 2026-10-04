@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useWizardForm } from "../hooks/useWizardForm";
-import { allowsNewGeneration, PAYMENT_STATE } from "../hooks/useGenerationProcess";
+import {
+  allowsNewGeneration,
+  PAYMENT_STATE,
+} from "../hooks/useGenerationProcess";
 import { useGenerationProcessContext } from "../hooks/GenerationProcessContext";
 import { StepContent } from "./steps/StepContent";
 import { UserBooks } from "./books/UserBooks";
@@ -103,7 +106,9 @@ function Wizard({ booksPortalTarget }) {
   useEffect(() => {
     if (activeFlow?.stage !== "book" || activeFlow?.status !== "success")
       return;
-    if (books.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)) {
+    if (
+      books.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)
+    ) {
       clearCompletedFlow(activeFlow.storyId);
       return;
     }
@@ -124,9 +129,13 @@ function Wizard({ booksPortalTarget }) {
 
   const handleSubmit = async () => {
     if (
-      isPhotoPermissionBlocked || !isStepValid() || isSubmitting ||
-      isRecoveryPending || !allowsNewGeneration(activeOperation)
-    ) return;
+      isPhotoPermissionBlocked ||
+      !isStepValid() ||
+      isSubmitting ||
+      isRecoveryPending ||
+      !allowsNewGeneration(activeOperation)
+    )
+      return;
     try {
       const response = await startGeneration(form);
       if (response) reset();
@@ -153,8 +162,7 @@ function Wizard({ booksPortalTarget }) {
   const isPhotoPermissionError =
     isPhotoStep && photoPermissionState === PHOTO_PERMISSION_STATE.ERROR;
   const isPhotoPermissionBlocked =
-    isPhotoStep &&
-    photoPermissionState !== PHOTO_PERMISSION_STATE.ALLOWED;
+    isPhotoStep && photoPermissionState !== PHOTO_PERMISSION_STATE.ALLOWED;
 
   return (
     <div className="wizard">
