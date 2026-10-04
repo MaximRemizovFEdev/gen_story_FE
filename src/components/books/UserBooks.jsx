@@ -55,7 +55,11 @@ const FlowPlaceholder = ({ flow, isRetrying, onRetry }) => {
           onClick={onRetry}
           disabled={isRetrying}
         >
-          {isRetrying ? "Обновляем..." : complete ? "Обновить библиотеку" : "Обновить статус"}
+          {isRetrying
+            ? "Обновляем..."
+            : complete
+              ? "Обновить библиотеку"
+              : "Обновить статус"}
         </button>
       )}
     </article>
@@ -75,7 +79,8 @@ export const UserBooks = ({
   const [resourceError, setResourceError] = useState("");
   const closeViewer = useCallback(() => setReadingBook(null), []);
   const displayedFlow =
-    activeFlow?.stage === "book" && activeFlow?.status === "success" &&
+    activeFlow?.stage === "book" &&
+    activeFlow?.status === "success" &&
     books.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)
       ? null
       : activeFlow;
@@ -160,16 +165,18 @@ export const UserBooks = ({
               <time dateTime={book.generatedAt}>
                 {formatGeneratedAt(book.generatedAt)}
               </time>
-              {storyId && <button
-                type="button"
-                className="user-book__read"
-                onClick={() => {
-                  setResourceError("");
-                  setReadingBook({ ...book, storyId });
-                }}
-              >
-                Читать книгу
-              </button>}
+              {storyId && (
+                <button
+                  type="button"
+                  className="user-book__read"
+                  onClick={() => {
+                    setResourceError("");
+                    setReadingBook({ ...book, storyId });
+                  }}
+                >
+                  Читать книгу
+                </button>
+              )}
               <a
                 href={apiService.getBookDownloadUrl(storyId)}
                 target="_blank"
@@ -182,7 +189,9 @@ export const UserBooks = ({
           );
         })}
       </div>
-      {isLoading && <p className="user-books-status">Обновляем библиотеку...</p>}
+      {isLoading && (
+        <p className="user-books-status">Обновляем библиотеку...</p>
+      )}
       {error && (
         <p className="user-books-error" role="alert">
           {error}

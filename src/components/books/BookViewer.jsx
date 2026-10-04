@@ -90,8 +90,11 @@ const FittedSceneText = ({ text }) => {
       if (cancelled || !measureRef.current) return;
       measureRef.current.textContent = text;
       const fontSize = findFittingFontSize(measureRef.current);
-      setFit((previous) => previous?.fontSize === fontSize && previous?.text === text
-        ? previous : { fontSize, text });
+      setFit((previous) =>
+        previous?.fontSize === fontSize && previous?.text === text
+          ? previous
+          : { fontSize, text },
+      );
     };
     let observer;
     waitForFonts().then(() => {
@@ -120,7 +123,9 @@ const FittedSceneText = ({ text }) => {
         className="book-viewer__text-content book-viewer__text-measure"
         aria-hidden="true"
       />
-      {!fit && <div className="book-viewer__text-preparing">Готовим текст…</div>}
+      {!fit && (
+        <div className="book-viewer__text-preparing">Готовим текст…</div>
+      )}
       {fit && (
         <div
           className="book-viewer__text-panel"
@@ -177,7 +182,10 @@ export const BookViewer = ({ storyId, title, onClose }) => {
 
   const pages = useMemo(() => buildPages(book), [book]);
   const currentPage = pages[pageIndex] || null;
-  const scale = Math.min(availableSize.width / PAGE_WIDTH, availableSize.height / PAGE_HEIGHT);
+  const scale = Math.min(
+    availableSize.width / PAGE_WIDTH,
+    availableSize.height / PAGE_HEIGHT,
+  );
   const canGoBack = pageIndex > 0;
   const canGoForward = pageIndex < pages.length - 1;
 
@@ -186,7 +194,9 @@ export const BookViewer = ({ storyId, title, onClose }) => {
   }, []);
 
   const goForward = useCallback(() => {
-    setPageIndex((current) => Math.max(0, Math.min(pages.length - 1, current + 1)));
+    setPageIndex((current) =>
+      Math.max(0, Math.min(pages.length - 1, current + 1)),
+    );
   }, [pages.length]);
 
   useEffect(() => {
@@ -235,7 +245,8 @@ export const BookViewer = ({ storyId, title, onClose }) => {
     appRoot?.setAttribute("aria-hidden", "true");
     appRoot?.setAttribute("inert", "");
     const containFocus = (event) => {
-      if (!dialogRef.current?.contains(event.target)) closeButtonRef.current?.focus();
+      if (!dialogRef.current?.contains(event.target))
+        closeButtonRef.current?.focus();
     };
     document.addEventListener("focusin", containFocus);
 
@@ -246,7 +257,8 @@ export const BookViewer = ({ storyId, title, onClose }) => {
       if (previousHidden == null) appRoot?.removeAttribute("aria-hidden");
       else appRoot?.setAttribute("aria-hidden", previousHidden);
       if (!previousInert) appRoot?.removeAttribute("inert");
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+      if (opener instanceof HTMLElement && opener.isConnected)
+        opener.focus({ preventScroll: true });
     };
   }, []);
 
@@ -256,8 +268,18 @@ export const BookViewer = ({ storyId, title, onClose }) => {
       const stage = stageRef.current;
       const style = getComputedStyle(stage);
       setAvailableSize({
-        width: Math.max(0, stage.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)),
-        height: Math.max(0, stage.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0)),
+        width: Math.max(
+          0,
+          stage.clientWidth -
+            (parseFloat(style.paddingLeft) || 0) -
+            (parseFloat(style.paddingRight) || 0),
+        ),
+        height: Math.max(
+          0,
+          stage.clientHeight -
+            (parseFloat(style.paddingTop) || 0) -
+            (parseFloat(style.paddingBottom) || 0),
+        ),
       });
     };
     updateSize();
@@ -277,9 +299,14 @@ export const BookViewer = ({ storyId, title, onClose }) => {
         onClose();
         return;
       }
-      if ((event.key === "ArrowLeft" || event.key === "ArrowRight") &&
-          !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey &&
-          !window.getSelection()?.toString()) {
+      if (
+        (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+        !event.shiftKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !window.getSelection()?.toString()
+      ) {
         event.preventDefault();
         if (event.key === "ArrowLeft") goBack();
         else goForward();
@@ -319,16 +346,27 @@ export const BookViewer = ({ storyId, title, onClose }) => {
       touchStartRef.current = null;
       return;
     }
-    touchStartRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+    touchStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    };
   };
 
   const handlePointerUp = (event) => {
     const start = touchStartRef.current;
     touchStartRef.current = null;
-    if (!start || event.pointerId !== start.pointerId || event.isPrimary === false || window.getSelection()?.toString()) return;
+    if (
+      !start ||
+      event.pointerId !== start.pointerId ||
+      event.isPrimary === false ||
+      window.getSelection()?.toString()
+    )
+      return;
     const deltaX = event.clientX - start.x;
     const deltaY = event.clientY - start.y;
-    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.4) return;
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.4)
+      return;
     if (deltaX < 0) goForward();
     else goBack();
   };
@@ -360,8 +398,12 @@ export const BookViewer = ({ storyId, title, onClose }) => {
           className="book-viewer__stage"
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
-          onPointerCancel={() => { touchStartRef.current = null; }}
-          onLostPointerCapture={() => { touchStartRef.current = null; }}
+          onPointerCancel={() => {
+            touchStartRef.current = null;
+          }}
+          onLostPointerCapture={() => {
+            touchStartRef.current = null;
+          }}
         >
           {status === "loading" && (
             <div className="book-viewer__status">

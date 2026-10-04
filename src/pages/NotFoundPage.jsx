@@ -11,7 +11,7 @@ export default function NotFoundPage() {
           <span className="auth-card__kicker">404 · Потерялись в сказке?</span>
           <h1>Страница не найдена</h1>
           <p>Возможно, адрес изменился или в ссылку закралась опечатка.</p>
-          <Link className="button button--primary" to="/">
+          <Link className="button button--primary pad" to="/">
             На главную
           </Link>
         </section>

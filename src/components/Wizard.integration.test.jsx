@@ -56,6 +56,7 @@ describe("Wizard with recovered consumed operation", () => {
       requests.push({ path, method: options.method || "GET", body: options.body });
       if (path === "/api/books") return libraryError ? response({ message: "library unavailable" }, 500) : response(library);
       if (path === "/api/payments/generation/current") return response({ operation: current });
+      if (path === `/api/generation-drafts/${current.draftId}/status`) return response({ ...current });
       if (path === "/api/generation-drafts") return response({ draftId: "new-draft" }, 201);
       if (path === "/api/payments/generation/create") return response({ confirmationUrl: "https://example.com/new-checkout" }, 201);
       throw new Error(`Unexpected request: ${path}`);
@@ -64,6 +65,7 @@ describe("Wizard with recovered consumed operation", () => {
   afterEach(() => {
     delete window.__GEN_STORY_NAVIGATE__;
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
   const mount = () => render(
     <GenerationProcessProvider><Wizard booksPortalTarget={document.body} /></GenerationProcessProvider>,
@@ -126,4 +128,24 @@ describe("Wizard with recovered consumed operation", () => {
     else expect(createButton()).toBeDisabled();
     expect(requests.filter(r => r.method === "POST")).toHaveLength(0);
   });
+  it("allows a new pending checkout, stops its old polling, and recovers pending again on reload", async () => {
+    current = { ...completed, paymentStatus: "pending", generationStatus: "not_started", storyId: null };
+    const first = mount();
+    await fillQuestionnaire();
+    expect(requests.filter(r => r.method === "POST")).toHaveLength(0);
+    expect(createButton()).toBeEnabled();
+    first.unmount();
+    const restored = mount();
+    await fillQuestionnaire();
+    fireEvent.click(createButton());
+    await waitFor(() => expect(window.__GEN_STORY_NAVIGATE__).toHaveBeenCalled());
+    expect(JSON.parse(requests.find(r => r.path.endsWith("/create")).body)).toEqual({ draftId: "new-draft" });
+    const count = requests.filter(r => r.path.includes("/old-draft/status")).length;
+    vi.useFakeTimers();
+    await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
+    expect(requests.filter(r => r.path.includes("/old-draft/status"))).toHaveLength(count);
+    expect(requests.filter(r => r.method === "POST")).toHaveLength(2);
+    restored.unmount();
+  });
+
 });
