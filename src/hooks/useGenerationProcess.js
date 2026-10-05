@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AUTH_STATUS, useAuth } from "../auth/AuthContext";
+import { reachGoalOnce } from "../utils/analytics";
 import apiService from "../services/ApiService";
 
 export const FLOW_STAGE = Object.freeze({
@@ -127,6 +128,12 @@ export const useGenerationProcess = () => {
   }, []);
 
   const setOperation = useCallback((operation) => {
+    if (["paid", "reserved", "consumed", "generation_failed"].includes(operation?.paymentStatus)) {
+      reachGoalOnce("payment_success", operation.draftId);
+    }
+    if (isReadyOperation(operation)) {
+      reachGoalOnce("generation_success", operation.storyId);
+    }
     operationRef.current = operation;
     setActiveOperation(operation);
     setOperationUiState(deriveOperationUiState(operation));
@@ -365,6 +372,7 @@ export const useGenerationProcess = () => {
         );
         if (revision !== revisionRef.current) return null;
         newDraftId = draft.draftId;
+        reachGoalOnce("wizard_complete", newDraftId);
         attemptRef.current = { draftId: newDraftId };
         setAcceptedDraftId(newDraftId);
         setPaymentState(PAYMENT_STATE.CREATING);
@@ -372,6 +380,7 @@ export const useGenerationProcess = () => {
         if (revision !== revisionRef.current) return null;
         setPaymentConfirmationUrl(payment.confirmationUrl);
         setPaymentState(PAYMENT_STATE.WAITING);
+        reachGoalOnce("payment_start", draft.draftId);
         navigateToCheckout(payment.confirmationUrl);
         return { draftId: draft.draftId, payment };
       } catch (error) {
@@ -527,6 +536,7 @@ export const useGenerationProcess = () => {
           result.stage === FLOW_STAGE.BOOK &&
           result.status === FLOW_STATUS.SUCCESS
         ) {
+          reachGoalOnce("generation_success", storyId);
           setOperationUiState(OPERATION_UI_STATE.READY);
           return;
         }

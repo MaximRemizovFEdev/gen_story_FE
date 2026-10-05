@@ -165,7 +165,7 @@ function Wizard({ booksPortalTarget }) {
     isPhotoStep && photoPermissionState !== PHOTO_PERMISSION_STATE.ALLOWED;
 
   return (
-    <div className="wizard">
+    <div className="wizard ym-disable-clickmap ym-disable-keys ym-hide-content">
       <div className="wizard__header">
         <div>
           <span className="wizard__kicker">
