@@ -71,6 +71,8 @@ describe("useGenerationProcess", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    localStorage.clear();
+    window.ym = vi.fn();
     authState = { status: "authenticated", sessionVersion: 0 };
     assign = vi.fn();
     window.__GEN_STORY_NAVIGATE__ = assign;
@@ -89,6 +91,7 @@ describe("useGenerationProcess", () => {
 
   afterEach(() => {
     delete window.__GEN_STORY_NAVIGATE__;
+    delete window.ym;
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -121,6 +124,10 @@ describe("useGenerationProcess", () => {
     expect(apiService.createGenerationPayment).toHaveBeenCalledWith("draft-1");
     expect(assign).toHaveBeenCalledWith("https://yoomoney.ru/checkout/payments/1");
     expect(result.current.paymentState).toBe(PAYMENT_STATE.WAITING);
+    expect(window.ym.mock.calls).toEqual([
+      [113444344, "reachGoal", "wizard_complete"],
+      [113444344, "reachGoal", "payment_start"],
+    ]);
   });
 
   it("guards rapid duplicate submits while checkout preparation is pending", async () => {
@@ -619,4 +626,29 @@ describe("useGenerationProcess", () => {
     expect(apiService.getCurrentGenerationOperation).toHaveBeenCalledTimes(1);
   });
 
+});
+
+ describe("Metrica backend confirmations", () => {
+  it("deduplicates success across flow polling, operation recovery and remount", async () => {
+    localStorage.clear();
+    window.ym = vi.fn();
+    authState = { status: "authenticated", sessionVersion: 0 };
+    const running = operation({ paymentStatus: "reserved", generationStatus: "running", storyId: "ready-story" });
+    apiService.getCurrentGenerationOperation.mockResolvedValue(running);
+    apiService.getGenerationFlowStatus.mockResolvedValue(flowStatus("book", "success", "ready-story"));
+    const first = renderHook(() => useGenerationProcess());
+    await flush();
+    await flush();
+    first.unmount();
+    apiService.getCurrentGenerationOperation.mockResolvedValue({ ...running, paymentStatus: "consumed", generationStatus: "success" });
+    const second = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { await second.result.current.refreshStatus(); });
+    expect(window.ym.mock.calls).toEqual([
+      [113444344, "reachGoal", "payment_success"],
+      [113444344, "reachGoal", "generation_success"],
+    ]);
+    second.unmount();
+    delete window.ym;
+  });
 });

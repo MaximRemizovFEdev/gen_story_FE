@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { trackWizardStart, finishWizardAnalytics } from "../utils/analytics";
 import { steps } from "../config/steps";
 
 export const useWizardForm = () => {
@@ -18,6 +19,7 @@ export const useWizardForm = () => {
   const current = steps[step - 1];
 
   const handleChange = (e) => {
+    trackWizardStart();
     const { name, value, checked } = e.target;
     if (name === "interests") {
       setForm((prev) => {
@@ -73,6 +75,7 @@ export const useWizardForm = () => {
   }, []);
 
   const reset = useCallback(() => {
+    finishWizardAnalytics();
     setStep(1);
     setForm({
       childName: "",

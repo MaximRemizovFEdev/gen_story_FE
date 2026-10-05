@@ -96,6 +96,7 @@ export const UserBooks = ({
       const blob = await apiService.downloadBook(storyId);
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
+      link.className = "ym-disable-tracklink";
       link.href = objectUrl;
       link.download = `${title || storyId}.pdf`;
       link.click();
@@ -178,6 +179,7 @@ export const UserBooks = ({
                 </button>
               )}
               <a
+                className="ym-disable-tracklink"
                 href={apiService.getBookDownloadUrl(storyId)}
                 target="_blank"
                 rel="noopener noreferrer"

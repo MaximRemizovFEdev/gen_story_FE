@@ -7,6 +7,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useEffect } from "react";
+import { trackPage } from "./utils/analytics";
 import SiteFooter from "./components/SiteFooter";
 import LandingPage from "./pages/LandingPage";
 import LegalDocumentPage from "./pages/LegalDocumentPage";
@@ -47,6 +48,7 @@ export function AppRoutes() {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
+    trackPage(pathname);
   }, [pathname]);
   return (
     <div className="site-layout">
