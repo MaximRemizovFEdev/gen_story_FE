@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import react from 'eslint-plugin-react';
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**'] },
+  { ignores: ['.kilo/**', '.next/**', 'coverage/**', 'dist/**', 'node_modules/**'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {

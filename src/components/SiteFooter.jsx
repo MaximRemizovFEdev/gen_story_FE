@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { legalLinks, service } from "../config/service";
 
 export default function SiteFooter() {
@@ -7,14 +7,14 @@ export default function SiteFooter() {
     <footer className="site-footer">
       <div className="container site-footer__grid">
         <div>
-          <Link className="site-footer__brand" to="/">
+          <Link className="site-footer__brand" href="/">
             {service.name}
           </Link>
           <p>Истории, в которых живёт детство.</p>
         </div>
         <nav aria-label="Юридические документы">
           {legalLinks.map(({ path, label }) => (
-            <Link key={path} to={path}>
+            <Link key={path} href={path}>
               {label}
             </Link>
           ))}

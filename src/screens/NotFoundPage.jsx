@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import PublicHeader from "../components/PublicHeader";
 
 export default function NotFoundPage() {
@@ -11,7 +11,7 @@ export default function NotFoundPage() {
           <span className="auth-card__kicker">404 · Потерялись в сказке?</span>
           <h1>Страница не найдена</h1>
           <p>Возможно, адрес изменился или в ссылку закралась опечатка.</p>
-          <Link className="button button--primary pad" to="/">
+          <Link className="button button--primary pad" href="/">
             На главную
           </Link>
         </section>

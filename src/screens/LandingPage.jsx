@@ -1,5 +1,7 @@
+"use client";
+
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import PublicHeader from "../components/PublicHeader";
 import { AUTH_STATUS, useAuth } from "../auth/AuthContext";
 import { service } from "../config/service";
@@ -25,7 +27,7 @@ export default function LandingPage() {
             </p>
             <Link
               className="button button--primary pad"
-              to={authenticated ? "/app" : "/auth"}
+              href={authenticated ? "/app" : "/auth"}
             >
               {authenticated
                 ? "Перейти в личный кабинет"
@@ -37,7 +39,7 @@ export default function LandingPage() {
           </div>
           <img
             className="landing-artwork"
-            src={artwork}
+            src={artwork.src}
             alt="Ребёнок на добром драконе вылетает из волшебной книги"
           />
         </section>
@@ -93,12 +95,12 @@ export default function LandingPage() {
               скачать в PDF или читать онлайн.
             </p>
             <Link
-              to={authenticated ? "/app" : "/auth"}
+              href={authenticated ? "/app" : "/auth"}
               className="button button--primary pad"
             >
               {authenticated ? "В личный кабинет" : "Войти и создать сказку"}
             </Link>
-            <Link className="offer-link" to="/oferta">
+            <Link className="offer-link" href="/oferta">
               Условия оказания услуги
             </Link>
           </div>

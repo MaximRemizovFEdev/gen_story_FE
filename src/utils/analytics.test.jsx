@@ -1,7 +1,12 @@
 ﻿import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useWizardForm } from '../hooks/useWizardForm';
-import { reachGoalOnce, trackPage } from './analytics';
+import {
+  finishAuthAnalytics,
+  reachGoalOnce,
+  startAuthAnalytics,
+  trackPage,
+} from './analytics';
 
 beforeEach(() => {
   localStorage.clear();
@@ -14,6 +19,15 @@ afterEach(() => {
 });
 
 describe('Metrica privacy and deduplication', () => {
+  it('counts a confirmed authentication attempt once', () => {
+    startAuthAnalytics();
+    finishAuthAnalytics();
+    finishAuthAnalytics();
+    expect(window.ym.mock.calls).toEqual([
+      [113444344, 'reachGoal', 'auth_success'],
+    ]);
+  });
+
   it('keeps operation IDs local and survives module reload', async () => {
     reachGoalOnce('payment_success', 'private-draft');
     reachGoalOnce('payment_success', 'private-draft');

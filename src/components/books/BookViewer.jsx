@@ -177,7 +177,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
   const closeButtonRef = useRef(null);
   const dialogRef = useRef(null);
   const stageRef = useRef(null);
-  const openerRef = useRef(document.activeElement);
+  const openerRef = useRef(null);
   const touchStartRef = useRef(null);
 
   const pages = useMemo(() => buildPages(book), [book]);
@@ -233,6 +233,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
   }, [storyId, reloadToken]);
 
   useEffect(() => {
+    openerRef.current = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     const previousRootOverflow = document.documentElement.style.overflow;
     const appRoot = document.getElementById("root");

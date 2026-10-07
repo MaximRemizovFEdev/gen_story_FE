@@ -1,11 +1,6 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import PublicHeader from "../components/PublicHeader";
-import privacy from "../layerDocs/privacy.md?raw";
-import policy from "../layerDocs/policy.md?raw";
-import oferta from "../layerDocs/oferta.md?raw";
-
-const documents = { privacy, policy, oferta };
 const linkPattern =
   /(https?:\/\/[^\s]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|8 910 562-97-08)/gi;
 
@@ -30,7 +25,7 @@ function linkedText(text) {
       return (
         <React.Fragment key={index}>
           {local ? (
-            <Link to={url.replace("https://aidaskazka.ru", "") || "/"}>
+            <Link href={url.replace("https://aidaskazka.ru", "") || "/"}>
               {url}
             </Link>
           ) : (
@@ -44,13 +39,13 @@ function linkedText(text) {
   });
 }
 
-export default function LegalDocumentPage({ document }) {
-  const [title, ...lines] = documents[document].trim().split(/\r?\n/);
+export default function LegalDocumentPage({ source }) {
+  const [title, ...lines] = source.trim().split(/\r?\n/);
   return (
     <>
       <PublicHeader />
       <main className="legal-page container">
-        <Link className="back-link" to="/">
+        <Link className="back-link" href="/">
           ← На главную
         </Link>
         <article className="legal-document">

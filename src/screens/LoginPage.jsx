@@ -1,9 +1,13 @@
+"use client";
+
 import React, { useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { finishAuthAnalytics, startAuthAnalytics } from "../utils/analytics";
 import horizontalLogo from "../assets/horizont-logo.png";
 
 const isDevLoginVisible =
-  import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_ENABLED === "true";
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_DEV_AUTH_ENABLED === "true";
 
 export default function LoginPage({
   showDevLogin = isDevLoginVisible,
@@ -13,10 +17,12 @@ export default function LoginPage({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const handleDevLogin = async () => {
+    startAuthAnalytics();
     setIsLoading(true);
     setError("");
     try {
-      await devLogin();
+      const user = await devLogin();
+      if (user) finishAuthAnalytics();
     } catch (requestError) {
       setError(
         requestError.status === 404
@@ -28,12 +34,17 @@ export default function LoginPage({
     }
   };
 
+  const handleYandexLogin = () => {
+    startAuthAnalytics();
+    navigateToYandex();
+  };
+
   return (
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="login-title">
         <img
           className="auth-card__logo"
-          src={horizontalLogo}
+          src={horizontalLogo.src}
           alt="Детки-сказки"
         />
         <span className="auth-card__kicker">Личная библиотека сказок</span>
@@ -45,7 +56,7 @@ export default function LoginPage({
         <button
           type="button"
           className="button button--primary auth-card__action"
-          onClick={navigateToYandex}
+          onClick={handleYandexLogin}
         >
           Войти с Яндекс ID
         </button>
