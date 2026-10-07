@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import Wizard from "../components/Wizard";
 import heroArtwork from "../assets/storybook-hero.jpg";
@@ -25,7 +27,7 @@ function HomePage() {
         <a className="brand" href="#top" aria-label="Детки-сказки — на главную">
           <img
             className="brand__logo"
-            src={horizontalLogo}
+            src={horizontalLogo.src}
             alt="Детки-сказки"
           />
         </a>
@@ -77,7 +79,7 @@ function HomePage() {
         <aside className="hero__visual" aria-label="Сказочное приключение">
           <div className="hero__halo" />
           <img
-            src={heroArtwork}
+            src={heroArtwork.src}
             alt="Ребёнок летит на добром драконе из волшебной книги"
           />
           <div className="story-note story-note--top">

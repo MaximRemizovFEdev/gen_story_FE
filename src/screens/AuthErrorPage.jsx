@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 
 export default function AuthErrorPage() {
   return (
@@ -10,7 +10,7 @@ export default function AuthErrorPage() {
         <p>
           Попробуйте войти ещё раз. Если ошибка повторяется, вернитесь позже.
         </p>
-        <Link className="button button--primary pad auth-card__action" to="/auth">
+        <Link className="button button--primary pad auth-card__action" href="/auth">
           Повторить вход
         </Link>
       </section>

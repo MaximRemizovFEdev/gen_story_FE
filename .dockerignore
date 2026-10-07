@@ -3,6 +3,9 @@
 .env
 .env.*
 node_modules
+.next
+.kilo
+coverage
 dist
 build
 out

@@ -1,5 +1,8 @@
-import React, { useEffect, useMemo } from "react";
-import { Link, useLocation } from "react-router-dom";
+"use client";
+
+import React, { useEffect } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AUTH_STATUS, useAuth } from "../auth/AuthContext";
 import {
   OPERATION_UI_STATE,
@@ -44,8 +47,7 @@ const STATUS_TEXT = {
   },
 };
 
-const getReturnDraftId = (search) => {
-  const params = new URLSearchParams(search);
+const getReturnDraftId = (params) => {
   return (
     params.get("draftId") ||
     params.get("draft_id") ||
@@ -68,8 +70,8 @@ const stageText = (flow) => {
 
 export default function PaymentReturnPage() {
   const { status } = useAuth();
-  const location = useLocation();
-  const draftId = useMemo(() => getReturnDraftId(location.search), [location.search]);
+  const searchParams = useSearchParams();
+  const draftId = getReturnDraftId(searchParams);
   const {
     activeOperation,
     activeFlow,
@@ -121,7 +123,7 @@ export default function PaymentReturnPage() {
           >
             Обновить статус
           </button>
-          <Link className="button button--primary pad" to="/app">
+          <Link className="button button--primary pad" href="/app">
             В библиотеку
           </Link>
         </div>

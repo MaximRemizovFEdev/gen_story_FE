@@ -1,12 +1,11 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../auth/AuthContext";
-import { RootRoute } from "../../App";
+import ProtectedAppPage from "../../screens/ProtectedAppPage";
 import { UserBooks } from "./UserBooks";
 
-vi.mock("../../pages/HomePage", () => ({
+vi.mock("../../screens/HomePage", () => ({
   default: () => <UserBooks books={[{
     storyId: "session-book", title: "Session book", generatedAt: "2026-09-30",
   }]} />,
@@ -15,6 +14,8 @@ vi.mock("../../pages/HomePage", () => ({
 afterEach(() => vi.unstubAllGlobals());
 
 it("removes the viewer and restores the document when /book expires the session", async () => {
+  const replace = vi.fn();
+  globalThis.__NEXT_ROUTER_MOCK__ = { replace };
   let expire;
   const response = (body, status = 200) => new Response(JSON.stringify(body), {
     status, headers: { "Content-Type": "application/json" },
@@ -32,12 +33,7 @@ it("removes the viewer and restores the document when /book expires the session"
   document.body.append(root);
   const view = render(
     <AuthProvider>
-      <MemoryRouter initialEntries={["/app"]}>
-        <Routes>
-          <Route path="/app" element={<RootRoute />} />
-          <Route path="/auth" element={<p>Session ended</p>} />
-        </Routes>
-      </MemoryRouter>
+      <ProtectedAppPage />
     </AuthProvider>,
     { container: root },
   );
@@ -48,7 +44,7 @@ it("removes the viewer and restores the document when /book expires the session"
     expect(document.body.style.overflow).toBe("hidden");
     await waitFor(() => expect(expire).toBeTypeOf("function"));
     expire();
-    expect(await screen.findByText("Session ended")).toBeInTheDocument();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/auth"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(root).not.toHaveAttribute("inert");
     expect(root).not.toHaveAttribute("aria-hidden");

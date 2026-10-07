@@ -1,9 +1,12 @@
+"use client";
+
 import React, { useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import horizontalLogo from "../assets/horizont-logo.png";
 
 const isDevLoginVisible =
-  import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_ENABLED === "true";
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_DEV_AUTH_ENABLED === "true";
 
 export default function LoginPage({
   showDevLogin = isDevLoginVisible,
@@ -33,7 +36,7 @@ export default function LoginPage({
       <section className="auth-card" aria-labelledby="login-title">
         <img
           className="auth-card__logo"
-          src={horizontalLogo}
+          src={horizontalLogo.src}
           alt="Детки-сказки"
         />
         <span className="auth-card__kicker">Личная библиотека сказок</span>

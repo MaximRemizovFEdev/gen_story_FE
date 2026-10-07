@@ -1,26 +1,26 @@
-import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+"use client";
+
+import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../auth/AuthContext";
 
 export default function AuthSuccessPage() {
   const { refreshSession } = useAuth();
-  const [destination, setDestination] = useState(null);
+  const router = useRouter();
   useEffect(() => {
     let active = true;
     refreshSession()
       .then((user) => {
-        if (active) setDestination(user ? "/app" : "/auth");
+        if (active) router.replace(user ? "/app" : "/auth");
       })
       .catch(() => {
-        if (active) setDestination("/auth/error");
+        if (active) router.replace("/auth/error");
       });
     return () => {
       active = false;
     };
-  }, [refreshSession]);
-  return destination ? (
-    <Navigate to={destination} replace />
-  ) : (
+  }, [refreshSession, router]);
+  return (
     <main className="auth-page">
       <p className="auth-status">Проверяем сессию…</p>
     </main>
