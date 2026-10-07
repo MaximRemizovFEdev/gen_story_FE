@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../auth/AuthContext";
+import { finishAuthAnalytics } from "../utils/analytics";
 
 export default function AuthSuccessPage() {
   const { refreshSession } = useAuth();
@@ -11,7 +12,9 @@ export default function AuthSuccessPage() {
     let active = true;
     refreshSession()
       .then((user) => {
-        if (active) router.replace(user ? "/app" : "/auth");
+        if (!active) return;
+        if (user) finishAuthAnalytics();
+        router.replace(user ? "/app" : "/auth");
       })
       .catch(() => {
         if (active) router.replace("/auth/error");

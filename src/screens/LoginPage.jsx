@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { finishAuthAnalytics, startAuthAnalytics } from "../utils/analytics";
 import horizontalLogo from "../assets/horizont-logo.png";
 
 const isDevLoginVisible =
@@ -16,10 +17,12 @@ export default function LoginPage({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const handleDevLogin = async () => {
+    startAuthAnalytics();
     setIsLoading(true);
     setError("");
     try {
-      await devLogin();
+      const user = await devLogin();
+      if (user) finishAuthAnalytics();
     } catch (requestError) {
       setError(
         requestError.status === 404
@@ -29,6 +32,11 @@ export default function LoginPage({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleYandexLogin = () => {
+    startAuthAnalytics();
+    navigateToYandex();
   };
 
   return (
@@ -48,7 +56,7 @@ export default function LoginPage({
         <button
           type="button"
           className="button button--primary auth-card__action"
-          onClick={navigateToYandex}
+          onClick={handleYandexLogin}
         >
           Войти с Яндекс ID
         </button>

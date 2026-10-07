@@ -46,3 +46,20 @@ export function finishWizardAnalytics() {
     sessionStorage.removeItem(`${PREFIX}wizard`);
   } catch { /* No effect on form or payment state. */ }
 }
+
+export function startAuthAnalytics() {
+  try {
+    const id = crypto.randomUUID();
+    sessionStorage.setItem(`${PREFIX}auth`, id);
+  } catch { /* Authentication must work when storage is unavailable. */ }
+}
+
+export function finishAuthAnalytics() {
+  try {
+    const key = `${PREFIX}auth`;
+    const id = sessionStorage.getItem(key);
+    if (!id) return;
+    reachGoalOnce('auth_success', id);
+    sessionStorage.removeItem(key);
+  } catch { /* Analytics must never interrupt authentication. */ }
+}
