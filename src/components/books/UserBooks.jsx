@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import apiService from "../../services/ApiService";
+import { BookViewer } from "./BookViewer";
 import { SceneEditorModal } from "./SceneEditorModal";
 
 const STAGE_LABELS = {
-  story: "Создаём историю",
+  story: "Создаем историю",
   cover: "Рисуем обложку",
   scenes: "Готовим иллюстрации",
   book: "Собираем книгу",
@@ -37,24 +38,28 @@ const FlowPlaceholder = ({ flow, isRetrying, onRetry }) => {
           ? "Не удалось создать книгу"
           : complete
             ? "Книга готова"
-            : "Ваша книга создаётся"}
+            : "Ваша книга создается"}
       </h3>
       <p className="user-book__flow-stage">
         {failed
           ? `Ошибка на этапе: ${STAGE_LABELS[flow.stage] || flow.stage}`
           : complete
-            ? "Обновляем библиотеку…"
+            ? "Обновляем библиотеку..."
             : STAGE_LABELS[flow.stage]}
       </p>
       <small>Номер: {flow.storyId}</small>
-      {failed && (
+      {(failed || complete) && (
         <button
           type="button"
           className="button button--primary user-book__retry"
           onClick={onRetry}
           disabled={isRetrying}
         >
-          {isRetrying ? "Запускаем снова…" : "Попробовать снова"}
+          {isRetrying
+            ? "Обновляем..."
+            : complete
+              ? "Обновить библиотеку"
+              : "Обновить статус"}
         </button>
       )}
     </article>
@@ -70,7 +75,19 @@ export const UserBooks = ({
   onRetry = () => undefined,
 }) => {
   const [editingBook, setEditingBook] = useState(null);
+  const [readingBook, setReadingBook] = useState(null);
   const [resourceError, setResourceError] = useState("");
+  const closeViewer = useCallback(() => setReadingBook(null), []);
+  const displayedFlow =
+    activeFlow?.stage === "book" &&
+    activeFlow?.status === "success" &&
+    books.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)
+      ? null
+      : activeFlow;
+  const flowStoryId = displayedFlow?.storyId || null;
+  const visibleBooks = flowStoryId
+    ? books.filter((book) => (book.storyId ?? book.id) !== flowStoryId)
+    : books;
 
   const handleDownload = async (event, storyId, title) => {
     event.preventDefault();
@@ -79,6 +96,7 @@ export const UserBooks = ({
       const blob = await apiService.downloadBook(storyId);
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
+      link.className = "ym-disable-tracklink";
       link.href = objectUrl;
       link.download = `${title || storyId}.pdf`;
       link.click();
@@ -93,11 +111,11 @@ export const UserBooks = ({
     }
   };
 
-  if (isLoading && !activeFlow && !books.length)
+  if (isLoading && !activeFlow && !visibleBooks.length)
     return <p className="user-books-status">Загружаем ваши книги...</p>;
-  if (error && !activeFlow && !books.length)
+  if (error && !activeFlow && !visibleBooks.length)
     return <p className="user-books-error">{error}</p>;
-  if (!books.length && !activeFlow) return null;
+  if (!visibleBooks.length && !activeFlow) return null;
 
   return (
     <section className="user-books" id="user-books">
@@ -109,14 +127,14 @@ export const UserBooks = ({
         <p>Готовые истории и текущий процесс создания книги находятся здесь.</p>
       </div>
       <div className="user-books-list">
-        {activeFlow && (
+        {displayedFlow && (
           <FlowPlaceholder
-            flow={activeFlow}
+            flow={displayedFlow}
             isRetrying={isRetrying}
             onRetry={onRetry}
           />
         )}
-        {books.map((book) => {
+        {visibleBooks.map((book) => {
           const storyId = book.storyId ?? book.id;
           return (
             <article
@@ -148,19 +166,34 @@ export const UserBooks = ({
               <time dateTime={book.generatedAt}>
                 {formatGeneratedAt(book.generatedAt)}
               </time>
+              {storyId && (
+                <button
+                  type="button"
+                  className="user-book__read"
+                  onClick={() => {
+                    setResourceError("");
+                    setReadingBook({ ...book, storyId });
+                  }}
+                >
+                  Читать книгу
+                </button>
+              )}
               <a
+                className="ym-disable-tracklink"
                 href={apiService.getBookDownloadUrl(storyId)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(event) => handleDownload(event, storyId, book.title)}
               >
-                Скачать
+                Скачать PDF
               </a>
             </article>
           );
         })}
       </div>
-      {isLoading && <p className="user-books-status">Обновляем библиотеку…</p>}
+      {isLoading && (
+        <p className="user-books-status">Обновляем библиотеку...</p>
+      )}
       {error && (
         <p className="user-books-error" role="alert">
           {error}
@@ -175,6 +208,13 @@ export const UserBooks = ({
         <SceneEditorModal
           book={editingBook}
           onClose={() => setEditingBook(null)}
+        />
+      )}
+      {readingBook && (
+        <BookViewer
+          storyId={readingBook.storyId}
+          title={readingBook.title}
+          onClose={closeViewer}
         />
       )}
     </section>

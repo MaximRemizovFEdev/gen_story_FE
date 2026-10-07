@@ -1,26 +1,31 @@
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useWizardForm } from "../hooks/useWizardForm";
 import {
+  allowsNewGeneration,
   PAYMENT_STATE,
-  useGenerationProcess,
 } from "../hooks/useGenerationProcess";
+import { useGenerationProcessContext } from "../hooks/GenerationProcessContext";
 import { StepContent } from "./steps/StepContent";
 import { UserBooks } from "./books/UserBooks";
 import { steps } from "../config/steps";
 import { useUserBooks } from "../hooks/useUserBooks";
 import { useAuth } from "../auth/AuthContext";
 
+const PHOTO_PERMISSION_STATE = Object.freeze({
+  UNCHECKED: "unchecked",
+  PENDING: "pending",
+  ALLOWED: "allowed",
+  BLOCKED: "blocked",
+  ERROR: "error",
+});
+
 const getSubmitButtonText = (paymentState, isSubmitting) => {
   if (!isSubmitting) return "Создать мою сказку";
-  if (paymentState === PAYMENT_STATE.CHECKING) return "Проверяем оплату…";
-  if (paymentState === PAYMENT_STATE.CREATING) return "Готовим оплату…";
-  if (
-    paymentState === PAYMENT_STATE.WAITING ||
-    paymentState === PAYMENT_STATE.OPEN_BLOCKED
-  )
-    return "Ждём оплату…";
-  return "Запускаем создание…";
+  if (paymentState === PAYMENT_STATE.CHECKING) return "Сохраняем анкету...";
+  if (paymentState === PAYMENT_STATE.CREATING) return "Готовим оплату...";
+  if (paymentState === PAYMENT_STATE.WAITING) return "Переходим к оплате...";
+  return "Готовим создание...";
 };
 
 function Wizard({ booksPortalTarget }) {
@@ -38,17 +43,15 @@ function Wizard({ booksPortalTarget }) {
   const {
     activeFlow,
     isSubmitting,
+    isRecoveryPending,
     submitError,
-    hasTrackedFlow,
+    activeOperation,
     paymentState,
-    paymentConfirmationUrl,
-    isAwaitingPayment,
     startGeneration,
     retryGeneration,
+    checkNewSubmissionPermission,
     clearCompletedFlow,
-    reopenPayment,
-    checkPaymentStatus,
-  } = useGenerationProcess();
+  } = useGenerationProcessContext();
   const {
     books,
     isLoading,
@@ -56,10 +59,59 @@ function Wizard({ booksPortalTarget }) {
     reload: reloadBooks,
   } = useUserBooks(isAuthenticated);
   const completionRefreshRef = useRef(null);
+  const photoCheckVisitRef = useRef(0);
+  const [photoPermissionState, setPhotoPermissionState] = useState(
+    PHOTO_PERMISSION_STATE.UNCHECKED,
+  );
+
+  const runPhotoPermissionCheck = useCallback(
+    async (signal) => {
+      const visitId = photoCheckVisitRef.current + 1;
+      photoCheckVisitRef.current = visitId;
+      setPhotoPermissionState(PHOTO_PERMISSION_STATE.PENDING);
+      try {
+        const operation = await checkNewSubmissionPermission({ signal });
+        if (signal?.aborted || visitId !== photoCheckVisitRef.current) return;
+        setPhotoPermissionState(
+          allowsNewGeneration(operation)
+            ? PHOTO_PERMISSION_STATE.ALLOWED
+            : PHOTO_PERMISSION_STATE.BLOCKED,
+        );
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        if (visitId === photoCheckVisitRef.current) {
+          setPhotoPermissionState(PHOTO_PERMISSION_STATE.ERROR);
+        }
+      }
+    },
+    [checkNewSubmissionPermission],
+  );
+
+  useEffect(() => {
+    if (current?.field !== "childPhoto") {
+      photoCheckVisitRef.current += 1;
+      setPhotoPermissionState(PHOTO_PERMISSION_STATE.UNCHECKED);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    runPhotoPermissionCheck(controller.signal);
+    return () => {
+      controller.abort();
+      photoCheckVisitRef.current += 1;
+      setPhotoPermissionState(PHOTO_PERMISSION_STATE.UNCHECKED);
+    };
+  }, [current?.field, runPhotoPermissionCheck]);
 
   useEffect(() => {
     if (activeFlow?.stage !== "book" || activeFlow?.status !== "success")
       return;
+    if (
+      books.some((book) => (book.storyId ?? book.id) === activeFlow.storyId)
+    ) {
+      clearCompletedFlow(activeFlow.storyId);
+      return;
+    }
     if (completionRefreshRef.current === activeFlow.storyId) return;
     completionRefreshRef.current = activeFlow.storyId;
     reloadBooks()
@@ -73,26 +125,47 @@ function Wizard({ booksPortalTarget }) {
         }
       })
       .catch(() => undefined);
-  }, [activeFlow, reloadBooks, clearCompletedFlow]);
+  }, [activeFlow, books, reloadBooks, clearCompletedFlow]);
 
   const handleSubmit = async () => {
+    if (
+      isPhotoPermissionBlocked ||
+      !isStepValid() ||
+      isSubmitting ||
+      isRecoveryPending ||
+      !allowsNewGeneration(activeOperation)
+    )
+      return;
     try {
       const response = await startGeneration(form);
-      if (response) {
-        reset();
-        reloadBooks().catch(() => undefined);
-      }
+      if (response) reset();
     } catch {
       // Submission errors are exposed by the hook; the completed form stays intact.
     }
   };
 
-  const handleRetry = () => retryGeneration().catch(() => undefined);
-  const handleOpenPayment = () => reopenPayment();
-  const handleCheckPayment = () => checkPaymentStatus().catch(() => undefined);
+  const handleRetry = () => {
+    if (activeFlow?.stage === "book" && activeFlow?.status === "success") {
+      reloadBooks().catch(() => undefined);
+    } else {
+      retryGeneration().catch(() => undefined);
+    }
+  };
+  const handlePhotoPermissionRetry = () => {
+    const controller = new AbortController();
+    runPhotoPermissionCheck(controller.signal);
+  };
+
+  const isPhotoStep = current?.field === "childPhoto";
+  const isPhotoPermissionPending =
+    isPhotoStep && photoPermissionState === PHOTO_PERMISSION_STATE.PENDING;
+  const isPhotoPermissionError =
+    isPhotoStep && photoPermissionState === PHOTO_PERMISSION_STATE.ERROR;
+  const isPhotoPermissionBlocked =
+    isPhotoStep && photoPermissionState !== PHOTO_PERMISSION_STATE.ALLOWED;
 
   return (
-    <div className="wizard">
+    <div className="wizard ym-disable-clickmap ym-disable-keys ym-hide-content">
       <div className="wizard__header">
         <div>
           <span className="wizard__kicker">
@@ -124,30 +197,26 @@ function Wizard({ booksPortalTarget }) {
             {submitError}
           </p>
         )}
-        {isAwaitingPayment && (
-          <div className="payment-wait" role="status">
-            <p>
-              Оплатите заказ в открывшейся вкладке. Создание сказки начнётся
-              автоматически после подтверждения оплаты.
-            </p>
-            <div className="payment-wait__actions">
-              {paymentConfirmationUrl && (
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={handleOpenPayment}
-                >
-                  Открыть оплату
-                </button>
-              )}
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={handleCheckPayment}
-              >
-                Проверить оплату
-              </button>
-            </div>
+        {isRecoveryPending && (
+          <p className="generation-submit-error" role="status">
+            Восстанавливаем текущую операцию...
+          </p>
+        )}
+        {isPhotoPermissionPending && (
+          <p className="generation-submit-status" role="status">
+            Проверяем возможность создания…
+          </p>
+        )}
+        {isPhotoPermissionError && (
+          <div className="generation-submit-error" role="alert">
+            <p>Не удалось проверить возможность создания новой сказки.</p>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={handlePhotoPermissionRetry}
+            >
+              Повторить проверку
+            </button>
           </div>
         )}
       </div>
@@ -171,7 +240,13 @@ function Wizard({ booksPortalTarget }) {
           <button
             className="button button--primary"
             onClick={handleSubmit}
-            disabled={!isStepValid() || isSubmitting || hasTrackedFlow}
+            disabled={
+              !isStepValid() ||
+              isSubmitting ||
+              isRecoveryPending ||
+              !allowsNewGeneration(activeOperation) ||
+              isPhotoPermissionBlocked
+            }
           >
             {getSubmitButtonText(paymentState, isSubmitting)}{" "}
             <span aria-hidden="true">✦</span>
@@ -180,14 +255,13 @@ function Wizard({ booksPortalTarget }) {
       </div>
 
       {booksPortalTarget &&
-        step === 1 &&
         createPortal(
           <UserBooks
             books={books}
             isLoading={isLoading}
             error={booksError}
             activeFlow={activeFlow}
-            isRetrying={isSubmitting}
+            isRetrying={isSubmitting || isLoading}
             onRetry={handleRetry}
           />,
           booksPortalTarget,

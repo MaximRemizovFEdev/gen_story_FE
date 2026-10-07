@@ -10,7 +10,7 @@ export default function AuthErrorPage() {
         <p>
           Попробуйте войти ещё раз. Если ошибка повторяется, вернитесь позже.
         </p>
-        <Link className="button button--primary auth-card__action" to="/auth">
+        <Link className="button button--primary pad auth-card__action" to="/auth">
           Повторить вход
         </Link>
       </section>

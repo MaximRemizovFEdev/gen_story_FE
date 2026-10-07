@@ -1,0 +1,68 @@
+# Paid Generation Draft Flow
+
+Backend contract source: `../gen_story_BE/docs/swagger.yaml`, checked on 2026-09-26.
+
+## Endpoints
+
+- `POST /api/generation-drafts`
+  - JSON questionnaire, or multipart `formData` plus `childPhoto`.
+  - Returns `201 { draftId, expiresAt }`.
+  - The backend derives ownership from the authenticated session.
+- `POST /api/payments/generation/create`
+  - JSON body: `{ "draftId": "..." }`.
+  - Returns `201 { purchaseId, providerPaymentId, confirmationUrl }`.
+  - The frontend opens `confirmationUrl` in the current tab.
+- `GET /api/generation-drafts/{draftId}/status`
+  - Explicit, owner-scoped operation lookup.
+  - A foreign or missing operation returns `404`; the frontend must not replace it with discovery.
+- `GET /api/payments/generation/current`
+  - Read-only discovery for reload/sign-in without browser-held state.
+  - Returns `{ operation: null }` when no eligible operation exists.
+  - Never creates drafts, payments, generation, or retries failures.
+- `GET /api/generate-flow/{storyId}/status`
+  - Existing stage polling after an operation exposes a nonterminal `storyId`.
+- `GET /api/books`
+  - Existing authenticated library refresh.
+
+## Operation Statuses
+
+`paymentStatus` values:
+`not_created`, `pending`, `paid`, `reserved`, `consumed`, `canceled`, `failed`, `generation_failed`.
+
+`generationStatus` values:
+`not_started`, `queued`, `running`, `success`, `error`.
+
+Frontend states:
+
+- `checking_payment`: no payment yet or provider confirmation is pending.
+- `payment_confirmed`: payment is paid but generation has not started.
+- `generating`: generation is queued/running or a nonterminal `storyId` exists.
+- `ready`: payment is consumed, generation is successful, and `storyId` is present.
+- `error`: canceled/failed payment, generation failure, malformed status, or unavailable explicit operation.
+
+## Recovery Rules
+
+- Return URLs may contain `draftId`, `draft_id`, `operationId`, or `operation_id`; these are read identifiers only.
+- Explicit return identifiers use `/generation-drafts/{draftId}/status` and preserve `404`.
+- Plain returns, reloads, and later sign-ins use `/payments/generation/current`.
+- Discovery selection is backend-defined: paid/reserved first, then active pending payments, then terminal operations; newest wins within a priority group.
+- Consumed and generation-failed operations remain discoverable after draft/photo cleanup.
+- Payment-create uncertainty is reconciled by read-only status calls. The frontend does not automatically repeat payment creation.
+- `PAYMENT_RETURN_URL` is a backend deployment setting pointing at the frontend `/payment-return` route.
+
+## New checkout after a finished or unpaid purchase
+
+- Each visit to the photo step performs a fresh read-only current-operation check. Pending checks, check failures, invalid responses, and unknown purchase states keep submission disabled; retry repeats only the read. Inputs and photo remain intact.
+- A successful `operation: null` response or `paymentStatus` of `consumed`, `generation_failed`, `canceled`, or `failed` permits a new checkout. Consumed entitlement permits it even if the previous story failed.
+- The exact combination `pending / not_started` also permits a new user-initiated checkout. `not_created`, `paid`, `reserved`, unknown states, and `pending` with any other generation status remain blocking. Button state and submission guard share this rule.
+- A new user-initiated checkout creates a new draft and payment. Discovery never reuses an old entitlement or retries generation.
+- A listed ready book takes precedence over the same completed flow placeholder, including repeated photo-step discovery. A missing book can be reloaded with “Обновить библиотеку”; reconciliation does not block a permitted checkout.
+- This supersedes the null-only permission rule recorded in archived change `2026-10-03-recheck-generation-on-photo-step`. That archive documents historical behavior. Persistent history of multiple failed stories remains outside this frontend fix.
+
+## Polling and replacement checkout
+
+- Operation status reads use one sequential automatic polling chain per selected draftId. The first automatic read starts on tracking; subsequent reads wait 3000 ms after the previous request settles. Fresh response objects and pending-to-paid transitions do not reset the timer. Slow requests never overlap within that chain.
+- Explicit recovery and photo-step checks supersede the previous tracking generation and resume one chain for the selected operation. Terminal results, story allocation, logout and disposal stop operation polling; story progress retains its 10-second interval.
+- Accepting a new submission cancels the previous poll before creating a fresh draft and payment. Late old responses cannot restore the old operation. Duplicate clicks while submission is in progress do not create another checkout.
+- Draft-creation failure keeps the form/photo and does not automatically resume discovery or old polling. After a new draft is accepted, uncertain payment creation and read-only retries target only that new draftId, including 404 and transient failures; they never fall back to the old checkout or repeat POST automatically. While this attempt remains tracked, permission rechecks use its explicit status rather than discovery of a previous payment.
+- Detaching local tracking does not cancel the old provider payment. Its URL may remain payable. On reload, normal server discovery may return that old pending operation; pending/not_started still permits a new attempt.
