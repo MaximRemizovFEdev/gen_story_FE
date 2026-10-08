@@ -570,7 +570,7 @@ a { color: inherit; }
   border-radius: 16px;
   color: #08080a;
   background: rgba(255, 248, 220, .75);
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: "Ziyada Skar", Georgia, "Times New Roman", serif;
   font-weight: 400;
   letter-spacing: 0;
   text-align: left;
@@ -592,6 +592,10 @@ a { color: inherit; }
   letter-spacing: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.book-viewer__text-content.title {
+  font-family: "Ziyada Skar", Georgia, "Times New Roman", serif;
+  font-size: 32px;
 }
 .book-viewer__text-measure {
   position: absolute;
@@ -758,6 +762,10 @@ a { color: inherit; }
 }
 
 /* Immersive book viewer */
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+.book-viewer__header { grid-row: 1; grid-column: 1; }
+.book-viewer__stage { grid-row: 2; grid-column: 1; }
+.book-viewer__controls { grid-row: 3; grid-column: 1; }
 .book-viewer { overflow: hidden; padding: 0; background: radial-gradient(circle at center, #413a59, #12101d 72%); backdrop-filter: none; }
 .book-viewer__background { position: absolute; inset: -28px; z-index: -1; background-position: center; background-size: cover; filter: blur(22px) brightness(.34) saturate(.8); }
 .book-viewer__dialog { position: relative; width: 100%; height: 100%; max-height: none; grid-template-rows: 64px minmax(0, 1fr) 64px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -790,6 +798,26 @@ a { color: inherit; }
   .book-viewer__arrow--forward { right: max(2px, env(safe-area-inset-right)); }
   .book-viewer__controls { grid-template-columns: 1fr; padding: 4px max(50px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(50px, env(safe-area-inset-left)); }
   .book-viewer__counter { min-width: 48px; font-size: 13px; }
+}
+
+/* Controls keep their physical size independently of the A4 transform. */
+.book-viewer__text-toggle { width: 44px; height: 44px; transform-origin: center bottom; }
+.book-viewer__dialog { grid-template-columns: minmax(100px, 1fr) minmax(0, 520px) minmax(180px, 1fr); grid-template-rows: calc(60px + env(safe-area-inset-top, 0px)) minmax(0, 1fr) calc(64px + env(safe-area-inset-bottom, 0px)); }
+.book-viewer__header { display: contents; }
+.book-viewer__header .book-viewer__close { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 6; }
+.book-viewer__header .book-viewer__counter { grid-row: 3; grid-column: 1; justify-self: end; align-self: center; margin: 0 20px env(safe-area-inset-bottom, 0px) 0; }
+.book-viewer__header .book-viewer__download { grid-row: 3; grid-column: 3; justify-self: start; align-self: center; margin: 0 0 env(safe-area-inset-bottom, 0px) 20px; z-index: 4; white-space: nowrap; }
+.book-viewer__stage { grid-column: 1 / -1; }
+.book-viewer__controls { grid-column: 2; grid-template-columns: minmax(0, 1fr); padding-inline: 8px; }
+@media (max-width: 1024px) {
+  .book-viewer__dialog { grid-template-columns: minmax(0, 1fr); grid-template-rows: calc(60px + env(safe-area-inset-top, 0px)) minmax(0, 1fr) calc(54px + env(safe-area-inset-bottom, 0px)); }
+  .book-viewer__header { display: flex; min-height: 0; gap: 6px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left)); }
+  .book-viewer__header .book-viewer__close { position: static; flex: 0 0 44px; width: 44px; height: 44px; }
+  .book-viewer__header .book-viewer__counter { margin: 0 auto 0 0; min-width: 48px; }
+  .book-viewer__header .book-viewer__download { margin: 0; padding-inline: 10px; font-size: 12px; }
+  .book-viewer__stage { padding: 2px max(4px, env(safe-area-inset-right)) 2px max(4px, env(safe-area-inset-left)); }
+  .book-viewer__controls { grid-column: 1; padding: 4px max(50px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(50px, env(safe-area-inset-left)); }
+  .book-viewer__arrow { width: 44px; height: 44px; }
 }
 
 /* Shared public pages and application footer. */

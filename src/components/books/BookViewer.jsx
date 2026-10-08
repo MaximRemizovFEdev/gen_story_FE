@@ -79,7 +79,7 @@ const findFittingFontSize = (measureNode) => {
   return low;
 };
 
-const FittedSceneText = ({ text }) => {
+const FittedSceneText = ({ text, panelRef, isTitle }) => {
   const [fit, setFit] = useState(null);
   const measureRef = useRef(null);
 
@@ -115,13 +115,13 @@ const FittedSceneText = ({ text }) => {
       observer?.disconnect();
       document.fonts?.removeEventListener("loadingdone", measure);
     };
-  }, [text]);
+  }, [text, isTitle]);
 
   return (
     <>
       <div
         ref={measureRef}
-        className="book-viewer__text-content book-viewer__text-measure"
+        className={`book-viewer__text-content book-viewer__text-measure${isTitle ? " title" : ""}`}
         aria-hidden="true"
       />
       {!fit && (
@@ -129,13 +129,14 @@ const FittedSceneText = ({ text }) => {
       )}
       {fit && (
         <div
+          ref={panelRef}
           className="book-viewer__text-panel"
           style={{
             fontSize: fit.fontSize,
             lineHeight: LINE_HEIGHT,
           }}
         >
-          <div className="book-viewer__text-content">{text}</div>
+          <div className={`book-viewer__text-content${isTitle ? " title" : ""}`}>{text}</div>
         </div>
       )}
     </>
@@ -146,9 +147,13 @@ const Chevron = ({ expanded }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d={expanded ? "m6 9 6 6 6-6" : "m6 15 6-6 6 6"} /></svg>
 );
 
-const BookPage = ({ page, onImageError }) => {
+const BookPage = ({ page, onImageError, scale }) => {
   const [imageFailedFor, setImageFailedFor] = useState("");
   const [textExpanded, setTextExpanded] = useState(true);
+  const [panelHeight, setPanelHeight] = useState(86);
+  const panelRef = useCallback((node) => {
+    if (node) setPanelHeight(node.offsetHeight);
+  }, []);
 
   useEffect(() => {
     setImageFailedFor("");
@@ -172,11 +177,17 @@ const BookPage = ({ page, onImageError }) => {
           }}
         />
       )}
-      {page.kind === "scene" && textExpanded && <FittedSceneText text={page.text} />}
+      {(page.kind === "cover" || textExpanded) && (
+        <FittedSceneText text={page.kind === "cover" ? page.title : page.text} panelRef={panelRef} isTitle={page.kind === "cover"} />
+      )}
       {page.kind === "scene" && (
         <button
           type="button"
           className={`book-viewer__text-toggle ${textExpanded ? "" : "is-collapsed"}`}
+          style={{
+            bottom: PAGE_HEIGHT * 0.055 + (textExpanded ? panelHeight : 0),
+            transform: `translateX(-50%) scale(${scale > 0 ? 1 / scale : 1})`,
+          }}
           onClick={() => setTextExpanded((value) => !value)}
           aria-expanded={textExpanded}
           aria-label={textExpanded ? "Свернуть текст" : "Показать текст"}
@@ -422,7 +433,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
 
   const isFreeArea = (target) =>
     target instanceof Element && Boolean(target.closest("[data-viewer-free-area]")) &&
-    !target.closest("[data-viewer-protected]");
+    !target.closest("[data-viewer-protected], button, input, a, select, textarea");
 
   const handleDismissDown = (event) => {
     dismissStartRef.current = isFreeArea(event.target)
@@ -515,7 +526,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
                 className="book-viewer__sheet"
                 style={{ ...PAGE_STYLE, transform: `scale(${scale})` }}
               >
-                <BookPage key={`${storyId}-${pageIndex}`} page={currentPage} onImageError={() => setBackgroundFailed(true)} />
+                <BookPage key={`${storyId}-${pageIndex}`} page={currentPage} scale={scale} onImageError={() => setBackgroundFailed(true)} />
               </div>
             </div>
           )}
