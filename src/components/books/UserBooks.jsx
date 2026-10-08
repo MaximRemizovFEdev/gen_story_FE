@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import apiService from "../../services/ApiService";
+import { downloadBookPdf } from "../../utils/downloadBook";
 import { BookViewer } from "./BookViewer";
 import { SceneEditorModal } from "./SceneEditorModal";
 
@@ -93,14 +94,7 @@ export const UserBooks = ({
     event.preventDefault();
     setResourceError("");
     try {
-      const blob = await apiService.downloadBook(storyId);
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.className = "ym-disable-tracklink";
-      link.href = objectUrl;
-      link.download = `${title || storyId}.pdf`;
-      link.click();
-      URL.revokeObjectURL(objectUrl);
+      await downloadBookPdf(storyId, title);
     } catch (requestError) {
       if (requestError.status !== 401)
         setResourceError(

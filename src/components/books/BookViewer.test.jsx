@@ -8,6 +8,7 @@ import { BookViewer } from "./BookViewer";
 vi.mock("../../services/ApiService", () => ({
   default: {
     getStoryBook: vi.fn(),
+    downloadBook: vi.fn(),
   },
 }));
 
@@ -42,6 +43,7 @@ const deferred = () => {
 describe("BookViewer", () => {
   beforeEach(() => {
     apiService.getStoryBook.mockResolvedValue(book);
+    apiService.downloadBook.mockResolvedValue(new Blob(["pdf"]));
   });
 
   it("loads a fresh book request and starts on the cover", async () => {
@@ -265,6 +267,40 @@ describe("BookViewer", () => {
     pointer("pointerdown", 200, 100);
     pointer("pointerup", 100, 100);
     fireEvent.keyDown(document, { key: "ArrowRight" });
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+  });
+
+  it("seeks with an accessible range without a second keyboard transition", async () => {
+    render(<BookViewer storyId="story-1" onClose={vi.fn()} />);
+    await screen.findByText("1 / 3");
+    const range = screen.getByRole("slider", { name: /выбрать страницу/i });
+    expect(range).toHaveAttribute("aria-valuetext", "Страница 1 из 3");
+    fireEvent.change(range, { target: { value: "2" } });
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    fireEvent.keyDown(range, { key: "ArrowRight" });
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+  });
+
+  it("collapses scene text and resets it after leaving and returning", async () => {
+    render(<BookViewer storyId="story-1" onClose={vi.fn()} />);
+    await screen.findByText("1 / 3");
+    expect(screen.queryByRole("button", { name: /свернуть текст/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /вперёд/i }));
+    const collapse = await screen.findByRole("button", { name: /свернуть текст/i });
+    fireEvent.click(collapse);
+    expect(screen.queryByText("First scene text")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /вперёд/i }));
+    fireEvent.click(screen.getByRole("button", { name: /назад/i }));
+    expect(await screen.findByText("First scene text")).toBeInTheDocument();
+  });
+
+  it("downloads PDF explicitly without changing the current page", async () => {
+    render(<BookViewer storyId="story-1" onClose={vi.fn()} />);
+    await screen.findByText("1 / 3");
+    expect(apiService.downloadBook).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /вперёд/i }));
+    fireEvent.click(screen.getByRole("button", { name: /скачать pdf/i }));
+    await waitFor(() => expect(apiService.downloadBook).toHaveBeenCalledWith("story-1"));
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
   });
 });

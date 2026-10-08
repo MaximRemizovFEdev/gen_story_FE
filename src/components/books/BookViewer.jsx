@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import apiService from "../../services/ApiService";
+import { downloadBookPdf } from "../../utils/downloadBook";
 
 const PAGE_WIDTH = 840;
 const PAGE_HEIGHT = 1188;
@@ -141,11 +142,17 @@ const FittedSceneText = ({ text }) => {
   );
 };
 
-const BookPage = ({ page }) => {
+const Chevron = ({ expanded }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d={expanded ? "m6 9 6 6 6-6" : "m6 15 6-6 6 6"} /></svg>
+);
+
+const BookPage = ({ page, onImageError }) => {
   const [imageFailedFor, setImageFailedFor] = useState("");
+  const [textExpanded, setTextExpanded] = useState(true);
 
   useEffect(() => {
     setImageFailedFor("");
+    setTextExpanded(true);
   }, [page.id]);
 
   return (
@@ -159,10 +166,23 @@ const BookPage = ({ page }) => {
           className="book-viewer__page-image"
           src={page.imageUrl}
           alt={page.kind === "cover" ? `Обложка книги «${page.title}»` : ""}
-          onError={() => setImageFailedFor(page.id)}
+          onError={() => {
+            setImageFailedFor(page.id);
+            onImageError();
+          }}
         />
       )}
-      {page.kind === "scene" && <FittedSceneText text={page.text} />}
+      {page.kind === "scene" && textExpanded && <FittedSceneText text={page.text} />}
+      {page.kind === "scene" && (
+        <button
+          type="button"
+          className={`book-viewer__text-toggle ${textExpanded ? "" : "is-collapsed"}`}
+          onClick={() => setTextExpanded((value) => !value)}
+          aria-expanded={textExpanded}
+          aria-label={textExpanded ? "Свернуть текст" : "Показать текст"}
+          title={textExpanded ? "Свернуть текст" : "Показать текст"}
+        ><Chevron expanded={textExpanded} /></button>
+      )}
     </div>
   );
 };
@@ -174,11 +194,16 @@ export const BookViewer = ({ storyId, title, onClose }) => {
   const [error, setError] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
   const [availableSize, setAvailableSize] = useState({ width: 0, height: 0 });
+  const [backgroundFailed, setBackgroundFailed] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
   const closeButtonRef = useRef(null);
   const dialogRef = useRef(null);
   const stageRef = useRef(null);
   const openerRef = useRef(null);
   const touchStartRef = useRef(null);
+  const dismissStartRef = useRef(null);
+  const mountedRef = useRef(true);
 
   const pages = useMemo(() => buildPages(book), [book]);
   const currentPage = pages[pageIndex] || null;
@@ -188,6 +213,14 @@ export const BookViewer = ({ storyId, title, onClose }) => {
   );
   const canGoBack = pageIndex > 0;
   const canGoForward = pageIndex < pages.length - 1;
+
+  useEffect(() => {
+    setBackgroundFailed(false);
+  }, [pageIndex, storyId]);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   const goBack = useCallback(() => {
     setPageIndex((current) => Math.max(0, current - 1));
@@ -302,6 +335,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
       }
       if (
         (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+        event.target?.tagName !== "INPUT" &&
         !event.shiftKey &&
         !event.ctrlKey &&
         !event.metaKey &&
@@ -316,7 +350,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
 
       const focusable = Array.from(
         dialogRef.current.querySelectorAll(
-          'button:not(:disabled), [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
+          'button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
         ),
       );
       if (!focusable.length) return;
@@ -341,7 +375,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
     if (
       event.pointerType === "mouse" ||
       event.isPrimary === false ||
-      event.target.closest("button") ||
+      event.target.closest("button, input, a, select, textarea") ||
       window.getSelection()?.toString()
     ) {
       touchStartRef.current = null;
@@ -372,8 +406,48 @@ export const BookViewer = ({ storyId, title, onClose }) => {
     else goBack();
   };
 
+  const handleDownload = async () => {
+    if (downloadBusy) return;
+    setDownloadBusy(true);
+    setDownloadError("");
+    try {
+      await downloadBookPdf(storyId, book?.title || title);
+    } catch (requestError) {
+      if (mountedRef.current && requestError.status !== 401)
+        setDownloadError(requestError.status === 404 ? "PDF этой книги недоступен." : requestError.message);
+    } finally {
+      if (mountedRef.current) setDownloadBusy(false);
+    }
+  };
+
+  const isFreeArea = (target) =>
+    target instanceof Element && Boolean(target.closest("[data-viewer-free-area]")) &&
+    !target.closest("[data-viewer-protected]");
+
+  const handleDismissDown = (event) => {
+    dismissStartRef.current = isFreeArea(event.target)
+      ? { x: event.clientX, y: event.clientY, pointerId: event.pointerId }
+      : null;
+  };
+
+  const handleDismissUp = (event) => {
+    const start = dismissStartRef.current;
+    dismissStartRef.current = null;
+    if (start && start.pointerId === event.pointerId && isFreeArea(event.target) &&
+        Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 8) onClose();
+  };
+
   return createPortal(
-    <div className="book-viewer" role="presentation">
+    <div
+      className={`book-viewer ${backgroundFailed ? "has-neutral-background" : ""}`}
+      role="presentation"
+      data-viewer-free-area
+      onPointerDown={handleDismissDown}
+      onPointerUp={handleDismissUp}
+    >
+      {currentPage?.imageUrl && !backgroundFailed && (
+        <div className="book-viewer__background" style={{ backgroundImage: `url("${currentPage.imageUrl}")` }} aria-hidden="true" />
+      )}
       <section
         ref={dialogRef}
         className="book-viewer__dialog"
@@ -381,8 +455,8 @@ export const BookViewer = ({ storyId, title, onClose }) => {
         aria-modal="true"
         aria-labelledby="book-viewer-title"
       >
-        <header className="book-viewer__header">
-          <h2 id="book-viewer-title">{book?.title || title || "Книга"}</h2>
+        <h2 id="book-viewer-title" className="visually-hidden">{book?.title || title || "Книга"}</h2>
+        <header className="book-viewer__header" data-viewer-protected>
           <button
             ref={closeButtonRef}
             type="button"
@@ -392,11 +466,16 @@ export const BookViewer = ({ storyId, title, onClose }) => {
           >
             ×
           </button>
+          <span className="book-viewer__counter" aria-live="polite">{pages.length ? pageIndex + 1 : 0} / {pages.length || 0}</span>
+          <button type="button" className="book-viewer__download" onClick={handleDownload} disabled={downloadBusy || status !== "ready"} aria-busy={downloadBusy}>
+            {downloadBusy ? "Скачиваем…" : "Скачать PDF"}
+          </button>
         </header>
 
         <div
           ref={stageRef}
           className="book-viewer__stage"
+          data-viewer-free-area
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
           onPointerCancel={() => {
@@ -407,12 +486,12 @@ export const BookViewer = ({ storyId, title, onClose }) => {
           }}
         >
           {status === "loading" && (
-            <div className="book-viewer__status">
+            <div className="book-viewer__status" data-viewer-protected>
               <span className="gen-loader" /> Загружаем книгу…
             </div>
           )}
           {status === "error" && (
-            <div className="book-viewer__error" role="alert">
+            <div className="book-viewer__error" role="alert" data-viewer-protected>
               <p>{error}</p>
               <button
                 type="button"
@@ -426,6 +505,7 @@ export const BookViewer = ({ storyId, title, onClose }) => {
           {status === "ready" && currentPage && (
             <div
               className="book-viewer__scaled-page"
+              data-viewer-protected
               style={{
                 width: PAGE_WIDTH * scale,
                 height: PAGE_HEIGHT * scale,
@@ -435,33 +515,19 @@ export const BookViewer = ({ storyId, title, onClose }) => {
                 className="book-viewer__sheet"
                 style={{ ...PAGE_STYLE, transform: `scale(${scale})` }}
               >
-                <BookPage key={`${storyId}-${pageIndex}`} page={currentPage} />
+                <BookPage key={`${storyId}-${pageIndex}`} page={currentPage} onImageError={() => setBackgroundFailed(true)} />
               </div>
             </div>
           )}
         </div>
 
-        <footer className="book-viewer__controls">
-          <button
-            type="button"
-            className="button button--secondary"
-            onClick={goBack}
-            disabled={!canGoBack}
-          >
-            Назад
-          </button>
-          <span className="book-viewer__counter" aria-live="polite">
-            {pages.length ? pageIndex + 1 : 0} / {pages.length || 0}
-          </span>
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={goForward}
-            disabled={!canGoForward}
-          >
-            Вперёд
-          </button>
+        <footer className="book-viewer__controls" data-viewer-protected>
+          <label className="visually-hidden" htmlFor="book-viewer-page-range">Выбрать страницу</label>
+          <input id="book-viewer-page-range" className="book-viewer__range" type="range" min="1" max={Math.max(1, pages.length)} step="1" value={pages.length ? pageIndex + 1 : 1} disabled={status !== "ready" || pages.length <= 1} aria-valuetext={pages.length ? `Страница ${pageIndex + 1} из ${pages.length}` : "Книга загружается"} onChange={(event) => setPageIndex(Number(event.target.value) - 1)} />
+          {downloadError && <div className="book-viewer__download-error" role="alert">{downloadError}</div>}
         </footer>
+        <button type="button" className="book-viewer__arrow book-viewer__arrow--back" onClick={goBack} disabled={!canGoBack} aria-label="Назад">‹</button>
+        <button type="button" className="book-viewer__arrow book-viewer__arrow--forward" onClick={goForward} disabled={!canGoForward} aria-label="Вперёд">›</button>
       </section>
     </div>,
     document.body,

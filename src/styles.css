@@ -757,6 +757,41 @@ a { color: inherit; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
+/* Immersive book viewer */
+.book-viewer { overflow: hidden; padding: 0; background: radial-gradient(circle at center, #413a59, #12101d 72%); backdrop-filter: none; }
+.book-viewer__background { position: absolute; inset: -28px; z-index: -1; background-position: center; background-size: cover; filter: blur(22px) brightness(.34) saturate(.8); }
+.book-viewer__dialog { position: relative; width: 100%; height: 100%; max-height: none; grid-template-rows: 64px minmax(0, 1fr) 64px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.book-viewer__header { position: relative; z-index: 4; justify-content: flex-end; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left)); }
+.book-viewer__header .book-viewer__close { order: 3; }
+.book-viewer__header .book-viewer__counter { margin-right: auto; }
+.book-viewer__download { min-height: 44px; padding: 0 18px; border: 1px solid rgba(255,255,255,.55); border-radius: 999px; color: white; background: rgba(20,17,36,.72); cursor: pointer; font-weight: 800; }
+.book-viewer__download:disabled { cursor: wait; opacity: .65; }
+.book-viewer__stage { padding: 4px clamp(8px, 8vw, 100px); }
+.book-viewer__arrow { position: absolute; z-index: 5; top: 50%; display: grid; width: 52px; height: 52px; padding: 0 0 5px; place-items: center; border: 1px solid rgba(255,255,255,.6); border-radius: 50%; color: white; background: rgba(20,17,36,.7); cursor: pointer; font-size: 40px; line-height: 1; transform: translateY(-50%); }
+.book-viewer__arrow--back { left: max(12px, env(safe-area-inset-left)); }
+.book-viewer__arrow--forward { right: max(12px, env(safe-area-inset-right)); }
+.book-viewer__arrow:disabled { cursor: default; opacity: .3; }
+.book-viewer__controls { position: relative; z-index: 4; display: grid; grid-template-columns: minmax(180px, 520px); justify-content: center; padding: 8px max(64px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(64px, env(safe-area-inset-left)); }
+.book-viewer__range { width: 100%; min-height: 44px; accent-color: #f1c46b; cursor: pointer; }
+.book-viewer__range:disabled { cursor: default; opacity: .45; }
+.book-viewer__download-error { position: absolute; left: 50%; bottom: calc(100% + 4px); width: max-content; max-width: min(90vw, 460px); padding: 8px 12px; border-radius: 10px; color: white; background: #8e342e; text-align: center; transform: translateX(-50%); }
+.book-viewer__text-toggle { position: absolute; left: 50%; bottom: calc(var(--book-panel-bottom) + 350px - 22px); z-index: 3; display: grid; width: 52px; height: 52px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: #2b2140; background: rgba(255,248,220,.96); cursor: pointer; transform: translateX(-50%); }
+.book-viewer__text-toggle.is-collapsed { bottom: var(--book-panel-bottom); }
+.book-viewer__text-toggle svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 2.5; }
+
+@media (max-width: 760px) {
+  .book-viewer__dialog { grid-template-rows: 58px minmax(0, 1fr) 58px; border-radius: 0; }
+  .book-viewer__header { min-height: 0; padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right)); gap: 6px; }
+  .book-viewer__download { padding-inline: 10px; font-size: 12px; }
+  .book-viewer__close { flex-basis: 44px; width: 44px; height: 44px; }
+  .book-viewer__stage { padding: 2px 4px; }
+  .book-viewer__arrow { width: 44px; height: 44px; font-size: 34px; background: rgba(20,17,36,.78); }
+  .book-viewer__arrow--back { left: max(2px, env(safe-area-inset-left)); }
+  .book-viewer__arrow--forward { right: max(2px, env(safe-area-inset-right)); }
+  .book-viewer__controls { grid-template-columns: 1fr; padding: 4px max(50px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(50px, env(safe-area-inset-left)); }
+  .book-viewer__counter { min-width: 48px; font-size: 13px; }
+}
+
 /* Shared public pages and application footer. */
 .site-layout { min-height: 100vh; display: flex; flex-direction: column; }
 .site-content { flex: 1; min-width: 0; }
