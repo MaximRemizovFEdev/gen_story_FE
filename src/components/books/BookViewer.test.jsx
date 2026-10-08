@@ -56,7 +56,8 @@ describe("BookViewer", () => {
         expect.any(AbortSignal),
       ),
     );
-    expect(await screen.findByText("Read me")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Read me" })).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector(".book-viewer__text-panel")).toHaveTextContent("Read me"));
     expect(screen.getByText("1 / 3")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /обложка/i })).toHaveAttribute(
       "src",
@@ -155,7 +156,7 @@ describe("BookViewer", () => {
     view.rerender(<BookViewer storyId="story-2" title="Second" onClose={vi.fn()} />);
 
     expect(await screen.findByText("1 / 1")).toBeInTheDocument();
-    expect(screen.getByText("Second")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Second" })).toBeInTheDocument();
   });
 
   it("does not skip the cover after arrows are pressed while loading", async () => {

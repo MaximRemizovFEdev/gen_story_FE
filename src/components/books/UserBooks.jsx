@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import apiService from "../../services/ApiService";
-import { downloadBookPdf } from "../../utils/downloadBook";
+// import { downloadBookPdf } from "../../utils/downloadBook";
 import { BookViewer } from "./BookViewer";
 import { SceneEditorModal } from "./SceneEditorModal";
 
@@ -90,20 +90,20 @@ export const UserBooks = ({
     ? books.filter((book) => (book.storyId ?? book.id) !== flowStoryId)
     : books;
 
-  const handleDownload = async (event, storyId, title) => {
-    event.preventDefault();
-    setResourceError("");
-    try {
-      await downloadBookPdf(storyId, title);
-    } catch (requestError) {
-      if (requestError.status !== 401)
-        setResourceError(
-          requestError.status === 404
-            ? "Запрошенная книга недоступна."
-            : requestError.message,
-        );
-    }
-  };
+  // const handleDownload = async (event, storyId, title) => {
+  //   event.preventDefault();
+  //   setResourceError("");
+  //   try {
+  //     await downloadBookPdf(storyId, title);
+  //   } catch (requestError) {
+  //     if (requestError.status !== 401)
+  //       setResourceError(
+  //         requestError.status === 404
+  //           ? "Запрошенная книга недоступна."
+  //           : requestError.message,
+  //       );
+  //   }
+  // };
 
   if (isLoading && !activeFlow && !visibleBooks.length)
     return <p className="user-books-status">Загружаем ваши книги...</p>;
@@ -172,7 +172,7 @@ export const UserBooks = ({
                   Читать книгу
                 </button>
               )}
-              <a
+              {/* <a
                 className="ym-disable-tracklink"
                 href={apiService.getBookDownloadUrl(storyId)}
                 target="_blank"
@@ -180,7 +180,7 @@ export const UserBooks = ({
                 onClick={(event) => handleDownload(event, storyId, book.title)}
               >
                 Скачать PDF
-              </a>
+              </a> */}
             </article>
           );
         })}
