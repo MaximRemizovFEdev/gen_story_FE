@@ -6,8 +6,8 @@ import {
   PAYMENT_STATE,
 } from "../hooks/useGenerationProcess";
 import { useGenerationProcessContext } from "../hooks/GenerationProcessContext";
-import { StepContent } from "./steps/StepContent";
-import { UserBooks } from "./books/UserBooks";
+import { StepContent } from "./StepContent/StepContent";
+import { UserBooks } from "./UserBooks/UserBooks";
 import { steps } from "../config/steps";
 import { useUserBooks } from "../hooks/useUserBooks";
 import { useAuth } from "../auth/AuthContext";

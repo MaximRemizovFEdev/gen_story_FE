@@ -1,10 +1,22 @@
+import type {
+  AuthMeResponse, BookListItem, DevLoginResponse, GenerateBookResponse,
+  GenerationDraftCreation, GenerationFlowState, GenerationOperationStatus,
+  NormalizedBookViewer, NormalizedOperation, PaymentCreation, StoryQuestionnaire,
+  StoryScenesResponse, UpdateStoryScenesResponse,
+} from "../types/ApiService";
+
+type RequestConfig = { suppressUnauthorized?: boolean; responseType?: "blob" };
+type ApiError = Error & { status?: number; endpoint?: string; cause?: unknown };
+
 class ApiService {
+  baseUrl: string;
+  unauthorizedHandler: ((error: ApiError) => void) | null;
   constructor() {
     this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
     this.unauthorizedHandler = null;
   }
 
-  setUnauthorizedHandler(handler) {
+  setUnauthorizedHandler(handler: ((error: ApiError) => void) | null) {
     this.unauthorizedHandler = typeof handler === "function" ? handler : null;
     return () => {
       if (this.unauthorizedHandler === handler) this.unauthorizedHandler = null;
@@ -12,13 +24,13 @@ class ApiService {
   }
 
   async request(
-    path,
-    options = {},
+    path: string,
+    options: RequestInit = {},
     fallbackMessage = "Ошибка запроса",
-    config = {},
-  ) {
+    config: RequestConfig = {},
+  ): Promise<any> {
     let response;
-    const requestOptions = { ...options, credentials: "include" };
+    const requestOptions: RequestInit = { ...options, credentials: "include" };
     try {
       response = await fetch(`${this.baseUrl}${path}`, requestOptions);
     } catch (error) {
@@ -26,8 +38,8 @@ class ApiService {
       const networkError = new Error(
         `${fallbackMessage}. Не удалось связаться с сервером`,
       );
-      networkError.endpoint = path;
-      networkError.cause = error;
+      (networkError as ApiError).endpoint = path;
+      (networkError as ApiError).cause = error;
       throw networkError;
     }
 
@@ -47,7 +59,7 @@ class ApiService {
         // Use the endpoint-specific fallback when the response is unreadable.
       }
 
-      const requestError = new Error(serverMessage || fallbackMessage);
+      const requestError = new Error(serverMessage || fallbackMessage) as ApiError;
       requestError.status = response.status;
       requestError.endpoint = path;
       if (response.status === 401 && !config.suppressUnauthorized) {
@@ -63,13 +75,13 @@ class ApiService {
     return response.json();
   }
 
-  getCurrentUser() {
+  getCurrentUser(): Promise<AuthMeResponse> {
     return this.request("/auth/me", {}, "Не удалось проверить сессию", {
       suppressUnauthorized: true,
     });
   }
 
-  devLogin() {
+  devLogin(): Promise<DevLoginResponse> {
     return this.request(
       "/auth/dev-login",
       { method: "POST" },
@@ -78,7 +90,7 @@ class ApiService {
     );
   }
 
-  logout() {
+  logout(): Promise<null> {
     return this.request(
       "/auth/logout",
       { method: "POST" },
@@ -87,7 +99,7 @@ class ApiService {
     );
   }
 
-  async createGenerationDraft(questionnaire, childPhoto) {
+  async createGenerationDraft(questionnaire: StoryQuestionnaire, childPhoto: File | null): Promise<GenerationDraftCreation> {
     const response = !childPhoto
       ? await this.request(
           "/generation-drafts",
@@ -116,7 +128,7 @@ class ApiService {
     return response;
   }
 
-  async createGenerationPayment(draftId) {
+  async createGenerationPayment(draftId: string): Promise<PaymentCreation> {
     if (!draftId || typeof draftId !== "string") {
       throw new Error("Не найден draftId для создания платежа");
     }
@@ -142,14 +154,14 @@ class ApiService {
     return payment;
   }
 
-  createStoryFormData(questionnaire, childPhoto) {
+  createStoryFormData(questionnaire: StoryQuestionnaire, childPhoto: File): FormData {
     const body = new FormData();
     body.append("formData", JSON.stringify(questionnaire));
     body.append("childPhoto", childPhoto);
     return body;
   }
 
-  normalizeGenerationOperation(operation) {
+  normalizeGenerationOperation(operation: GenerationOperationStatus | null): NormalizedOperation | null {
     if (operation === null) return null;
     if (
       !operation ||
@@ -175,7 +187,7 @@ class ApiService {
     };
   }
 
-  async getGenerationOperationStatus(draftId, signal) {
+  async getGenerationOperationStatus(draftId: string, signal?: AbortSignal): Promise<NormalizedOperation> {
     if (!draftId || typeof draftId !== "string") {
       throw new Error("Не найден draftId для проверки статуса");
     }
@@ -187,10 +199,12 @@ class ApiService {
       },
       "Не удалось проверить статус операции",
     );
-    return this.normalizeGenerationOperation(operation);
+    const normalized = this.normalizeGenerationOperation(operation);
+    if (!normalized) throw new Error("Сервер вернул пустой статус операции");
+    return normalized;
   }
 
-  async getCurrentGenerationOperation(signal) {
+  async getCurrentGenerationOperation(signal?: AbortSignal): Promise<NormalizedOperation | null> {
     const response = await this.request(
       "/payments/generation/current",
       {
@@ -205,7 +219,7 @@ class ApiService {
     return this.normalizeGenerationOperation(response.operation);
   }
 
-  getGenerationFlowStatus(storyId, signal) {
+  getGenerationFlowStatus(storyId: string, signal?: AbortSignal): Promise<GenerationFlowState> {
     return this.request(
       `/generate-flow/${encodeURIComponent(storyId)}/status`,
       {
@@ -216,7 +230,7 @@ class ApiService {
     );
   }
 
-  regenerateBook(storyId) {
+  regenerateBook(storyId: string): Promise<GenerateBookResponse> {
     return this.request(
       "/generate-book",
       {
@@ -228,7 +242,7 @@ class ApiService {
     );
   }
 
-  getUserBooks(signal) {
+  getUserBooks(signal?: AbortSignal): Promise<BookListItem[]> {
     return this.request(
       "/books",
       { headers: { Accept: "application/json" }, signal },
@@ -236,7 +250,7 @@ class ApiService {
     );
   }
 
-  getStoryScenes(storyId, signal) {
+  getStoryScenes(storyId: string, signal?: AbortSignal): Promise<StoryScenesResponse> {
     return this.request(
       `/stories/${encodeURIComponent(storyId)}/scenes`,
       { headers: { Accept: "application/json" }, signal },
@@ -244,7 +258,7 @@ class ApiService {
     );
   }
 
-  async getStoryBook(storyId, signal) {
+  async getStoryBook(storyId: string, signal?: AbortSignal): Promise<NormalizedBookViewer> {
     const result = await this.request(
       `/stories/${encodeURIComponent(storyId)}/book`,
       { headers: { Accept: "application/json" }, signal },
@@ -286,7 +300,7 @@ class ApiService {
     };
   }
 
-  updateStoryScenes(storyId, scenes) {
+  updateStoryScenes(storyId: string, scenes: Array<{ sceneId: string | number; text: string }>): Promise<UpdateStoryScenesResponse> {
     return this.request(
       `/stories/${encodeURIComponent(storyId)}/scenes`,
       {
@@ -301,7 +315,7 @@ class ApiService {
     );
   }
 
-  downloadBook(storyId) {
+  downloadBook(storyId: string): Promise<Blob> {
     return this.request(
       `/books/${encodeURIComponent(storyId)}/download`,
       {},
