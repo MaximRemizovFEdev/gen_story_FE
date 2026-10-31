@@ -23,6 +23,23 @@ const buildPages = (book) => {
 };
 
 export const useBookViewer = ({ storyId, title, onClose }) => {
+  const [book, setBook] = useState(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [status, setStatus] = useState("loading");
+  const [error, setError] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
+  const [availableSize, setAvailableSize] = useState({ width: 0, height: 0 });
+  const [backgroundFailed, setBackgroundFailed] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+  const closeButtonRef = useRef(null);
+  const dialogRef = useRef(null);
+  const stageRef = useRef(null);
+  const openerRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const dismissStartRef = useRef(null);
+  const mountedRef = useRef(true);
+
   const handlePointerDown = (event) => {
     if (
       event.pointerType === "mouse" ||
@@ -115,23 +132,6 @@ export const useBookViewer = ({ storyId, title, onClose }) => {
 
   const handlePageChange = (event) =>
     setPageIndex(Number(event.target.value) - 1);
-
-  const [book, setBook] = useState(null);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [status, setStatus] = useState("loading");
-  const [error, setError] = useState("");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [availableSize, setAvailableSize] = useState({ width: 0, height: 0 });
-  const [backgroundFailed, setBackgroundFailed] = useState(false);
-  const [downloadBusy, setDownloadBusy] = useState(false);
-  const [downloadError, setDownloadError] = useState("");
-  const closeButtonRef = useRef(null);
-  const dialogRef = useRef(null);
-  const stageRef = useRef(null);
-  const openerRef = useRef(null);
-  const touchStartRef = useRef(null);
-  const dismissStartRef = useRef(null);
-  const mountedRef = useRef(true);
 
   const pages = useMemo(() => buildPages(book), [book]);
   const currentPage = pages[pageIndex] || null;

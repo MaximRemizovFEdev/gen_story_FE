@@ -1,45 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
+import { usePhotoUpload } from "./hooks";
+import type { PhotoUploadProps } from "./hooks";
 
-const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
-const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-export const PhotoUpload = ({ value, onChange }) => {
-  const inputRef = useRef(null);
-  const [error, setError] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
-
-  useEffect(() => {
-    if (!value) {
-      setPreviewUrl("");
-      return undefined;
-    }
-    const objectUrl = URL.createObjectURL(value);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [value]);
-
-  const selectFile = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
-      setError("Выберите фотографию в формате JPEG, PNG или WebP.");
-      event.target.value = "";
-      return;
-    }
-    if (file.size > MAX_PHOTO_SIZE) {
-      setError("Размер фотографии не должен превышать 10 МБ.");
-      event.target.value = "";
-      return;
-    }
-    setError("");
-    onChange(file);
-  };
-
-  const removeFile = () => {
-    setError("");
-    onChange(null);
-    if (inputRef.current) inputRef.current.value = "";
-  };
+export const PhotoUpload = ({ value, onChange }: PhotoUploadProps) => {
+  const {
+    inputRef,
+    error,
+    previewUrl,
+    selectFile,
+    removeFile,
+    openFilePicker,
+  } = usePhotoUpload({ value, onChange });
 
   return (
     <div className="photo-upload">
@@ -56,7 +27,7 @@ export const PhotoUpload = ({ value, onChange }) => {
             <button
               type="button"
               className="button button--secondary"
-              onClick={() => inputRef.current?.click()}
+              onClick={openFilePicker}
             >
               Заменить фото
             </button>
@@ -73,7 +44,7 @@ export const PhotoUpload = ({ value, onChange }) => {
         <button
           type="button"
           className="photo-upload__select"
-          onClick={() => inputRef.current?.click()}
+          onClick={openFilePicker}
         >
           Выбрать фото
           <small>JPEG, PNG или WebP, до 10 МБ</small>

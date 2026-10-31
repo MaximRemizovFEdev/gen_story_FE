@@ -1,15 +1,15 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
-import { BASE_FONT_SIZE, LINE_HEIGHT, TEXT_MAX_HEIGHT } from "../../constants";
+import { useLayoutEffect, useRef, useState } from "react";
+import { BASE_FONT_SIZE, LINE_HEIGHT, TEXT_MAX_HEIGHT } from "../../../../constants";
 
 const waitForFonts = () => {
   if (!document.fonts?.ready) return Promise.resolve();
   return document.fonts.ready.catch(() => undefined);
 };
 
-const findFittingFontSize = (measureNode) => {
+const findFittingFontSize = (measureNode: HTMLDivElement) => {
   let high = BASE_FONT_SIZE;
   let low = BASE_FONT_SIZE;
-  const fits = (size) => {
+  const fits = (size: number) => {
     measureNode.style.fontSize = `${size}px`;
     measureNode.style.lineHeight = String(LINE_HEIGHT);
     return (
@@ -31,9 +31,17 @@ const findFittingFontSize = (measureNode) => {
   return low;
 };
 
-export const FittedSceneText = ({ text, panelRef, isTitle }) => {
-  const [fit, setFit] = useState(null);
-  const measureRef = useRef(null);
+export const useFittedSceneText = ({
+  text,
+  isTitle,
+}: {
+  text: string;
+  isTitle: boolean;
+}) => {
+  const [fit, setFit] = useState<{ fontSize: number; text: string } | null>(
+    null,
+  );
+  const measureRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
     let cancelled = false;
@@ -49,7 +57,7 @@ export const FittedSceneText = ({ text, panelRef, isTitle }) => {
           : { fontSize, text },
       );
     };
-    let observer;
+    let observer: ResizeObserver | undefined;
     waitForFonts().then(() => {
       if (cancelled) return;
       measure();
@@ -57,7 +65,7 @@ export const FittedSceneText = ({ text, panelRef, isTitle }) => {
       // change this box and therefore doesn't recompose the page.
       if (typeof ResizeObserver !== "undefined") {
         observer = new ResizeObserver(measure);
-        observer.observe(measureRef.current);
+        observer.observe(measureRef.current!);
       }
     });
     document.fonts?.addEventListener("loadingdone", measure);
@@ -69,29 +77,5 @@ export const FittedSceneText = ({ text, panelRef, isTitle }) => {
     };
   }, [text, isTitle]);
 
-  return (
-    <>
-      <div
-        ref={measureRef}
-        className={`book-viewer__text-content book-viewer__text-measure${isTitle ? " title" : ""}`}
-        aria-hidden="true"
-      />
-      {!fit && (
-        <div className="book-viewer__text-preparing">Готовим текст…</div>
-      )}
-      {fit && (
-        <div
-          ref={panelRef}
-          className="book-viewer__text-panel"
-          style={{
-            fontSize: fit.fontSize,
-            lineHeight: LINE_HEIGHT,
-          }}
-        >
-          <div className={`book-viewer__text-content${isTitle ? " title" : ""}`}>{text}</div>
-        </div>
-      )}
-    </>
-  );
+  return { fit, measureRef };
 };
-

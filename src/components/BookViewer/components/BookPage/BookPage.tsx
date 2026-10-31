@@ -1,13 +1,23 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { PAGE_HEIGHT } from "../../constants";
-import { FittedSceneText } from "../FittedSceneText/FittedSceneText";
-import { Chevron } from "../Chevron/Chevron";
+import { FittedSceneText } from "./components/FittedSceneText/FittedSceneText";
+import { Chevron } from "./components/Chevron/Chevron";
 
-export const BookPage = ({ page, onImageError, scale }) => {
+type BookPageData =
+  | { id: string; kind: "cover"; imageUrl: string; title: string }
+  | { id: string; kind: "scene"; imageUrl: string; text: string };
+
+interface BookPageProps {
+  page: BookPageData;
+  onImageError: () => void;
+  scale: number;
+}
+
+export const BookPage = ({ page, onImageError, scale }: BookPageProps) => {
   const [imageFailedFor, setImageFailedFor] = useState("");
   const [textExpanded, setTextExpanded] = useState(true);
   const [panelHeight, setPanelHeight] = useState(86);
-  const panelRef = useCallback((node) => {
+  const panelRef = useCallback((node: HTMLDivElement | null) => {
     if (node) setPanelHeight(node.offsetHeight);
   }, []);
 

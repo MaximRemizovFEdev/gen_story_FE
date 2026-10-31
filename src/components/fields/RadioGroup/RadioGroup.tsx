@@ -1,6 +1,21 @@
 import React from "react";
+import type { ChangeEventHandler, ReactNode } from "react";
 
-export const RadioGroup = ({ label, name, value, onChange, options }) => (
+interface RadioGroupProps {
+  label: ReactNode;
+  name: string;
+  value: string;
+  onChange: ChangeEventHandler<HTMLInputElement>;
+  options: string[];
+}
+
+export const RadioGroup = ({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+}: RadioGroupProps) => (
   <fieldset className="choice-field">
     <legend>{label}</legend>
     <div className="choice-grid">
