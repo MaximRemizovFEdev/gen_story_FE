@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_STATUS, useAuth } from "../auth/AuthContext";
 import {
   OPERATION_UI_STATE,
@@ -71,6 +71,7 @@ const stageText = (flow) => {
 export default function PaymentReturnPage() {
   const { status } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const draftId = getReturnDraftId(searchParams);
   const {
     activeOperation,
@@ -80,6 +81,10 @@ export default function PaymentReturnPage() {
     isRecovering,
     recoverOperation,
     refreshStatus,
+    submitError,
+    isSubmitting,
+    canRetryGeneration,
+    retryFailedGeneration,
   } = useGenerationProcessContext();
 
   useEffect(() => {
@@ -114,7 +119,17 @@ export default function PaymentReturnPage() {
             {statusError}
           </p>
         )}
+        {submitError && <p className="auth-inline-error" role="alert">{submitError}</p>}
         <div className="payment-wait__actions">
+          {canRetryGeneration && (
+            <button type="button" className="button button--primary"
+              disabled={isSubmitting || isRecovering}
+              onClick={() => Promise.resolve(retryFailedGeneration()).then(response => {
+                if (response?.operation) router.replace(`/payment-return?draftId=${encodeURIComponent(response.draftId)}`);
+              }).catch(() => undefined)}>
+              Повторить создание
+            </button>
+          )}
           <button
             type="button"
             className="button button--secondary"

@@ -1,4 +1,18 @@
 import React from "react";
+import type { ChangeEvent, ReactNode } from "react";
+
+interface CheckboxGroupChangeEvent {
+  target: { name: string; value: string; checked: boolean };
+}
+
+interface CheckboxGroupProps {
+  label: ReactNode;
+  name: string;
+  value: string[];
+  onChange: (event: CheckboxGroupChangeEvent) => void;
+  options: string[];
+  max: number;
+}
 
 export const CheckboxGroup = ({
   label,
@@ -7,8 +21,8 @@ export const CheckboxGroup = ({
   onChange,
   options,
   max,
-}) => {
-  const handleChange = (event) => {
+}: CheckboxGroupProps) => {
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     onChange({
       target: {
         name,

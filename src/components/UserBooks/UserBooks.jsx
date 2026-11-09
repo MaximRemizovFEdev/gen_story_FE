@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from "react";
 import apiService from "../../services/ApiService";
 // import { downloadBookPdf } from "../../utils/downloadBook";
-import { BookViewer } from "./BookViewer";
-import { SceneEditorModal } from "./SceneEditorModal";
+import { BookViewer } from "../BookViewer/BookViewer";
+import { SceneEditorModal } from "../SceneEditorModal/SceneEditorModal";
 
 const STAGE_LABELS = {
   story: "Создаем историю",

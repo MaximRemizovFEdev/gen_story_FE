@@ -21,7 +21,7 @@ const completed = {
   storyId: book.storyId,
 };
 const response = (body, status = 200) => ({
-  ok: status === 200 || status === 201,
+  ok: status >= 200 && status < 300,
   status,
   headers: { get: () => "application/json" },
   json: async () => body,
@@ -45,16 +45,26 @@ describe("Wizard with recovered consumed operation", () => {
   let library;
   let libraryError;
   let current;
+  let balance;
   beforeEach(() => {
     requests = [];
     library = [book];
     libraryError = false;
     current = completed;
+    balance = { paid: false, availableGenerations: 0, reservedGenerations: 0,
+      balanceVersion: 0, packageSize: 5, canPurchase: true };
     window.__GEN_STORY_NAVIGATE__ = vi.fn();
     vi.stubGlobal("fetch", vi.fn(async (url, options = {}) => {
       const path = String(url).replace(/^.*\/api/, "/api");
       requests.push({ path, method: options.method || "GET", body: options.body });
       if (path === "/api/books") return libraryError ? response({ message: "library unavailable" }, 500) : response(library);
+      if (path === "/api/payments/generation/status") return response(balance);
+      if (path === "/api/generation-drafts/new-draft/start") {
+        balance = { ...balance, availableGenerations: balance.availableGenerations - 1,
+          reservedGenerations: 1, balanceVersion: balance.balanceVersion + 1 };
+        current = { draftId: "new-draft", paymentStatus: "reserved", generationStatus: "queued" };
+        return response({ draftId: "new-draft", operationId: "new-op", generationStatus: "queued" }, 202);
+      }
       if (path === "/api/payments/generation/current") return response({ operation: current });
       if (path === `/api/generation-drafts/${current.draftId}/status`) return response({ ...current });
       if (path === "/api/generation-drafts") return response({ draftId: "new-draft" }, 201);
@@ -70,6 +80,37 @@ describe("Wizard with recovered consumed operation", () => {
   const mount = () => render(
     <GenerationProcessProvider><Wizard booksPortalTarget={document.body} /></GenerationProcessProvider>,
   );
+
+  it.each([false, true])("starts with balance (paid=%s) without payment or redirect", async paid => {
+    const push = vi.fn();
+    globalThis.__NEXT_ROUTER_MOCK__ = { push };
+    balance = { ...balance, paid, availableGenerations: 4, canPurchase: false };
+    mount();
+    await fillQuestionnaire();
+    expect(screen.getByText(/Доступно генераций: 4/)).toBeInTheDocument();
+    fireEvent.click(createButton());
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/new-draft/status"))).toBe(true));
+    expect(requests.filter(r => r.method === "POST").map(r => r.path)).toEqual([
+      "/api/generation-drafts", "/api/generation-drafts/new-draft/start",
+    ]);
+    expect(window.__GEN_STORY_NAVIGATE__).not.toHaveBeenCalled();
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/payment-return?draftId=new-draft"));
+    await fillQuestionnaire();
+    expect(screen.getByText(/Доступно генераций: 3/)).toBeInTheDocument();
+  });
+
+  it("keeps checkout disabled for an empty balance with a reservation", async () => {
+    balance = { ...balance, reservedGenerations: 1, canPurchase: false };
+    current = { ...completed, paymentStatus: "reserved", generationStatus: "running", storyId: null };
+    mount();
+    fireEvent.change(screen.getByPlaceholderText("Введите имя"), { target: { value: "Миша" } });
+    next();
+    for (let i = 0; i < 4; i += 1) { fireEvent.click(screen.getAllByRole("radio")[0]); next(); }
+    fireEvent.click(screen.getAllByRole("checkbox")[0]); next();
+    await screen.findByText(/Дождитесь завершения текущей операции/);
+    expect(createButton()).toBeDisabled();
+    expect(requests.filter(r => r.method === "POST")).toHaveLength(0);
+  });
 
   it("keeps the ready card across photo-step rechecks and creates a new checkout only on click", async () => {
     mount();

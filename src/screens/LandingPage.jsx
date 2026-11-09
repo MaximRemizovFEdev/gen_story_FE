@@ -34,7 +34,7 @@ export default function LandingPage() {
                 : "Войти и создать сказку"}
             </Link>
             <p className="landing-caption">
-              Одна персональная сказка — {service.price} ₽
+              Пакет генераций сказок — {service.price} ₽
             </p>
           </div>
           <img
@@ -85,7 +85,7 @@ export default function LandingPage() {
               электронная книга.
             </p>
             <p className="landing-price">
-              {service.price} ₽ <span>за одну сказку</span>
+              {service.price} ₽ <span>за пакет генераций</span>
             </p>
           </div>
           <div className="landing-delivery">

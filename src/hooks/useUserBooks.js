@@ -11,11 +11,13 @@ export const useUserBooks = (enabled) => {
 
   const reload = useCallback(async () => {
     if (!enabledRef.current) return [];
+
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
     setIsLoading(true);
     setError(null);
+
     try {
       const result = await apiService.getUserBooks(controller.signal);
       const nextBooks = Array.isArray(result) ? result : [];

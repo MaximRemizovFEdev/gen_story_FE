@@ -8,6 +8,7 @@ import { finishAuthAnalytics } from "../utils/analytics";
 export default function AuthSuccessPage() {
   const { refreshSession } = useAuth();
   const router = useRouter();
+
   useEffect(() => {
     let active = true;
     refreshSession()
@@ -23,6 +24,7 @@ export default function AuthSuccessPage() {
       active = false;
     };
   }, [refreshSession, router]);
+
   return (
     <main className="auth-page">
       <p className="auth-status">Проверяем сессию…</p>

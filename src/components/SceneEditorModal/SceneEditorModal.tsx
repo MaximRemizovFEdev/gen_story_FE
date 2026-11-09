@@ -1,111 +1,30 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { createPortal } from "react-dom";
-import apiService from "../../services/ApiService";
+import { useSceneEditorModal } from "./hooks";
+import type { SceneEditorModalProps } from "./hooks";
 
-const countWords = (text) => text.trim().split(/\s+/u).filter(Boolean).length;
-
-export const SceneEditorModal = ({ book, onClose }) => {
-  const [title, setTitle] = useState(book.title);
-  const [scenes, setScenes] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveStage, setSaveStage] = useState("idle");
-  const [error, setError] = useState("");
-  const [isSaved, setIsSaved] = useState(false);
-  const closeButtonRef = useRef(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-
-    apiService
-      .getStoryScenes(book.storyId, controller.signal)
-      .then((result) => {
-        setTitle(result?.title || book.title);
-        setScenes(Array.isArray(result?.scenes) ? result.scenes : []);
-      })
-      .catch((requestError) => {
-        if (requestError.name !== "AbortError") setError(requestError.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-
-    return () => {
-      controller.abort();
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [book.storyId, book.title, onClose]);
-
-  const handleSceneChange = (sceneId, text) => {
-    setScenes((currentScenes) =>
-      currentScenes.map((scene) =>
-        scene.sceneId === sceneId ? { ...scene, text } : scene,
-      ),
-    );
-    setError("");
-    setIsSaved(false);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    setSaveStage("saving");
-    setError("");
-    setIsSaved(false);
-
-    try {
-      const updateResult = await apiService.updateStoryScenes(
-        book.storyId,
-        scenes.map(({ sceneId, text }) => ({ sceneId, text: text.trim() })),
-      );
-
-      if (updateResult?.requiresBookRegeneration) {
-        setSaveStage("rebuilding");
-        try {
-          await apiService.regenerateBook(book.storyId);
-        } catch (rebuildError) {
-          const errorWithContext = new Error(
-            `Тексты сцен сохранены, но книгу не удалось пересобрать. ${rebuildError.message}`,
-          );
-          errorWithContext.cause = rebuildError;
-          throw errorWithContext;
-        }
-      }
-
-      setScenes((currentScenes) =>
-        currentScenes.map((scene) => ({
-          ...scene,
-          text: scene.text.trim(),
-        })),
-      );
-      setIsSaved(true);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setIsSaving(false);
-      setSaveStage("idle");
-    }
-  };
-
-  const hasInvalidScenes = scenes.some(
-    (scene) => !scene.text.trim() || scene.text.trim().length > 1500,
-  );
+export const SceneEditorModal = ({ book, onClose }: SceneEditorModalProps) => {
+  const {
+    title,
+    scenes,
+    isLoading,
+    isSaving,
+    saveStage,
+    error,
+    isSaved,
+    closeButtonRef,
+    handleSceneChange,
+    handleSave,
+    hasInvalidScenes,
+    handleMouseDown,
+    countWords,
+  } = useSceneEditorModal({ book, onClose });
 
   return createPortal(
     <div
       className="scene-modal"
       role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      onMouseDown={handleMouseDown}
     >
       <section
         className="scene-modal__dialog"

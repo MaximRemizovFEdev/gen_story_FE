@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../auth/AuthContext";
 import ProtectedAppPage from "../../screens/ProtectedAppPage";
-import { UserBooks } from "./UserBooks";
+import { UserBooks } from "../UserBooks/UserBooks";
 
 vi.mock("../../screens/HomePage", () => ({
   default: () => <UserBooks books={[{

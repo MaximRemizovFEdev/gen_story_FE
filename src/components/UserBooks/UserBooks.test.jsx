@@ -41,30 +41,26 @@ describe("UserBooks", () => {
       "src",
       "/api/stories/12-34_28-08-2026/cover",
     );
-    expect(screen.getByRole("link", { name: /скачать/i })).toHaveAttribute(
-      "href",
-      "/api/books/12-34_28-08-2026/download",
-    );
+    expect(screen.queryByRole("link", { name: /скачать/i })).not.toBeInTheDocument();
   });
 
-  it("reports a missing book without expiring auth", async () => {
+  it("does not request a PDF while the download control is unavailable", async () => {
     apiService.downloadBook.mockRejectedValue(
       Object.assign(new Error("missing"), { status: 404 }),
     );
     render(<UserBooks books={[book]} isLoading={false} error={null} />);
-    fireEvent.click(screen.getByRole("link", { name: /скачать/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Запрошенная книга недоступна",
-    );
+    expect(screen.queryByRole("link", { name: /скачать/i })).not.toBeInTheDocument();
+    await waitFor(() => expect(apiService.downloadBook).not.toHaveBeenCalled());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("does not turn 401 into a local file error", async () => {
+  it("does not make a PDF request that could expire auth", async () => {
     apiService.downloadBook.mockRejectedValue(
       Object.assign(new Error("expired"), { status: 401 }),
     );
     render(<UserBooks books={[book]} isLoading={false} error={null} />);
-    fireEvent.click(screen.getByRole("link", { name: /скачать/i }));
-    await waitFor(() => expect(apiService.downloadBook).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: /скачать/i })).not.toBeInTheDocument();
+    await waitFor(() => expect(apiService.downloadBook).not.toHaveBeenCalled());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -137,11 +133,10 @@ describe("UserBooks", () => {
     expect(screen.getByText("1 / 1")).toBeInTheDocument();
   });
 
-  it("keeps PDF download independent from reading", async () => {
+  it("does not expose PDF download alongside reading", async () => {
     render(<UserBooks books={[book]} isLoading={false} error={null} />);
-    fireEvent.click(screen.getByRole("link"));
-
-    await waitFor(() => expect(apiService.downloadBook).toHaveBeenCalledWith(book.storyId));
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    await waitFor(() => expect(apiService.downloadBook).not.toHaveBeenCalled());
     expect(apiService.getStoryBook).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

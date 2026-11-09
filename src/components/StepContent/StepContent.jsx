@@ -1,8 +1,8 @@
 import React from "react";
-import { TextInput } from "../fields/TextInput";
-import { RadioGroup } from "../fields/RadioGroup";
-import { CheckboxGroup } from "../fields/CheckboxGroup";
-import { PhotoUpload } from "../fields/PhotoUpload";
+import { TextInput } from "../fields/TextInput/TextInput";
+import { RadioGroup } from "../fields/RadioGroup/RadioGroup";
+import { CheckboxGroup } from "../fields/CheckboxGroup/CheckboxGroup";
+import { PhotoUpload } from "../fields/PhotoUpload/PhotoUpload";
 import {
   ageOptions,
   heroOptions,

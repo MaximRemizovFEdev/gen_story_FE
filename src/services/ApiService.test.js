@@ -17,6 +17,57 @@ describe("ApiService", () => {
     vi.stubGlobal("fetch", vi.fn());
   });
 
+  it("reads a manually funded balance without purchase metadata, without caching", async () => {
+    const balance = { paid: false, availableGenerations: 4, reservedGenerations: 0,
+      balanceVersion: 2, packageSize: 5, canPurchase: false };
+    fetch.mockResolvedValue(jsonResponse(balance));
+    await expect(service.getGenerationBalance()).resolves.toEqual(balance);
+    expect(fetch).toHaveBeenCalledWith("/api/payments/generation/status", expect.objectContaining({
+      credentials: "include", cache: "no-store",
+    }));
+  });
+
+  it.each([null, {}, { paid: true, canPurchase: false, availableGenerations: -1 },
+    { paid: true, canPurchase: false, availableGenerations: 1, reservedGenerations: 0,
+      balanceVersion: 1, packageSize: 0 }])("rejects malformed balance %j", async (body) => {
+    fetch.mockResolvedValue(jsonResponse(body));
+    await expect(service.getGenerationBalance()).rejects.toThrow(/баланс/);
+  });
+
+  it("starts a draft without requiring a payment status in the 202 response", async () => {
+    const started = { operationId: "op-1", draftId: "draft/1", generationStatus: "queued" };
+    fetch.mockResolvedValue(jsonResponse(started, 202));
+    await expect(service.startGenerationDraft("draft/1")).resolves.toEqual(started);
+    expect(fetch).toHaveBeenCalledWith("/api/generation-drafts/draft%2F1/start", expect.objectContaining({
+      method: "POST", credentials: "include",
+    }));
+  });
+
+  it.each([{}, { operationId: "op", draftId: "other", generationStatus: "queued" }])(
+    "rejects malformed or mismatched start %j", async body => {
+      fetch.mockResolvedValue(jsonResponse(body, 202));
+      await expect(service.startGenerationDraft("draft-1")).rejects.toThrow(/ответ запуска/);
+    },
+  );
+
+  it.each([402, 409, 503])("preserves write error status %s", async status => {
+    fetch.mockResolvedValue(jsonResponse({ message: "unavailable" }, status));
+    await expect(service.startGenerationDraft("draft-1")).rejects.toMatchObject({ status });
+  });
+
+  it.each([
+    ["queued", "reserved"], ["running", "reserved"], ["success", "consumed"], ["error", "generation_failed"],
+  ])("normalizes balance funded %s/%s and disables read caching", async (generationStatus, paymentStatus) => {
+    const status = { draftId: "draft-1", generationStatus, paymentStatus, operationId: "op-1",
+      storyId: "story-1" };
+    fetch.mockResolvedValue(jsonResponse(status));
+    await expect(service.getGenerationOperationStatus("draft-1")).resolves.toMatchObject(status);
+    expect(fetch.mock.calls[0][1]).toMatchObject({ cache: "no-store", credentials: "include" });
+    fetch.mockResolvedValue(jsonResponse({ operation: status }));
+    await service.getCurrentGenerationOperation();
+    expect(fetch.mock.calls[1][1]).toMatchObject({ cache: "no-store", credentials: "include" });
+  });
+
   it("includes credentials and reports protected 401 responses", async () => {
     const handler = vi.fn();
     service.setUnauthorizedHandler(handler);

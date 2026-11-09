@@ -7,6 +7,7 @@ export interface FormDataType {
   adventureCustom: string;
   storyMood: string;
   interests: string[];
+  childPhoto: File | null;
 }
 
 export interface GenerationResult {
