@@ -26,6 +26,8 @@ vi.mock("../auth/AuthContext", () => ({
 vi.mock("../services/ApiService", () => ({
   default: {
     createGenerationDraft: vi.fn(),
+    getGenerationBalance: vi.fn(),
+    startGenerationDraft: vi.fn(),
     createGenerationPayment: vi.fn(),
     getGenerationOperationStatus: vi.fn(),
     getCurrentGenerationOperation: vi.fn(),
@@ -76,6 +78,11 @@ describe("useGenerationProcess", () => {
     authState = { status: "authenticated", sessionVersion: 0 };
     assign = vi.fn();
     window.__GEN_STORY_NAVIGATE__ = assign;
+    apiService.getGenerationBalance.mockReset().mockResolvedValue({ paid: false, availableGenerations: 0,
+      reservedGenerations: 0, balanceVersion: 0, packageSize: 5, canPurchase: true });
+    apiService.startGenerationDraft.mockReset().mockResolvedValue({
+      operationId: "op-1", draftId: "draft-1", generationStatus: "queued",
+    });
     apiService.createGenerationDraft.mockReset().mockResolvedValue({ draftId: "draft-1" });
     apiService.createGenerationPayment.mockReset().mockResolvedValue({
       purchaseId: "purchase-1",
@@ -122,12 +129,142 @@ describe("useGenerationProcess", () => {
       null,
     );
     expect(apiService.createGenerationPayment).toHaveBeenCalledWith("draft-1");
+    expect(apiService.startGenerationDraft).not.toHaveBeenCalled();
     expect(assign).toHaveBeenCalledWith("https://yoomoney.ru/checkout/payments/1");
     expect(result.current.paymentState).toBe(PAYMENT_STATE.WAITING);
     expect(window.ym.mock.calls).toEqual([
       [113444344, "reachGoal", "wizard_complete"],
       [113444344, "reachGoal", "payment_start"],
     ]);
+  });
+
+  it.each([true, false])("uses available balance (paid=%s) without checkout or a payment goal", async paid => {
+    apiService.getGenerationBalance.mockResolvedValue({ paid, availableGenerations: 4,
+      reservedGenerations: 0, balanceVersion: 2, packageSize: 5, canPurchase: false });
+    apiService.getGenerationOperationStatus.mockResolvedValue(operation({
+      paymentStatus: "reserved", generationStatus: "queued",
+    }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { await result.current.startGeneration(form); });
+    expect(apiService.startGenerationDraft).toHaveBeenCalledTimes(1);
+    expect(apiService.startGenerationDraft).toHaveBeenCalledWith("draft-1");
+    expect(apiService.createGenerationPayment).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+    expect(result.current.operationUiState).toBe(OPERATION_UI_STATE.GENERATING);
+    expect(apiService.getGenerationBalance.mock.calls.length).toBeGreaterThan(1);
+    expect(window.ym.mock.calls.some(call => call[2] === "payment_success")).toBe(false);
+  });
+
+  it("blocks new drafts and purchases at zero balance with a reservation", async () => {
+    apiService.getGenerationBalance.mockResolvedValue({ paid: true, availableGenerations: 0,
+      reservedGenerations: 1, balanceVersion: 3, packageSize: 5, canPurchase: false });
+    const running = operation({ paymentStatus: "reserved", generationStatus: "running" });
+    apiService.getCurrentGenerationOperation.mockResolvedValue(running);
+    apiService.getGenerationOperationStatus.mockResolvedValue(running);
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { expect(await result.current.startGeneration(form)).toBeNull(); });
+    expect(apiService.createGenerationDraft).not.toHaveBeenCalled();
+    expect(apiService.createGenerationPayment).not.toHaveBeenCalled();
+    expect(result.current.activeOperation).toMatchObject(running);
+  });
+
+  it.each([402, 409])("reconciles race %s using reads without repeating writes", async status => {
+    if (status === 402) {
+      apiService.getGenerationBalance.mockResolvedValue({ availableGenerations: 1, reservedGenerations: 0, canPurchase: false });
+      apiService.startGenerationDraft.mockRejectedValueOnce(Object.assign(new Error("race"), { status }));
+    } else apiService.createGenerationPayment.mockRejectedValueOnce(Object.assign(new Error("race"), { status }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { await expect(result.current.startGeneration(form)).rejects.toThrow("race"); });
+    expect(apiService.getCurrentGenerationOperation).toHaveBeenCalledTimes(2);
+    expect(apiService.createGenerationDraft).toHaveBeenCalledTimes(1);
+    expect(apiService.startGenerationDraft).toHaveBeenCalledTimes(status === 402 ? 1 : 0);
+    expect(apiService.createGenerationPayment).toHaveBeenCalledTimes(status === 409 ? 1 : 0);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("recovers an uncertain start explicitly and never repeats it", async () => {
+    apiService.getGenerationBalance.mockResolvedValue({ availableGenerations: 1, canPurchase: false });
+    apiService.startGenerationDraft.mockRejectedValueOnce(new Error("lost response"));
+    apiService.getGenerationOperationStatus.mockResolvedValue(operation({ paymentStatus: "reserved", generationStatus: "running" }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { await expect(result.current.startGeneration(form)).rejects.toThrow("lost response"); });
+    await act(async () => { await result.current.refreshStatus(); });
+    expect(apiService.startGenerationDraft).toHaveBeenCalledTimes(1);
+    expect(apiService.createGenerationPayment).not.toHaveBeenCalled();
+    expect(apiService.getCurrentGenerationOperation).toHaveBeenCalledTimes(1);
+    expect(result.current.activeOperation.generationStatus).toBe("running");
+  });
+
+  it("does not let checkout 503 prevent a later balance-funded submission", async () => {
+    apiService.createGenerationPayment.mockRejectedValueOnce(Object.assign(new Error("payments disabled"), { status: 503 }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { await expect(result.current.startGeneration(form)).rejects.toThrow("payments disabled"); });
+    apiService.getGenerationBalance.mockResolvedValue({ availableGenerations: 1, canPurchase: false });
+    apiService.createGenerationDraft.mockResolvedValueOnce({ draftId: "draft-2" });
+    apiService.startGenerationDraft.mockResolvedValueOnce({ draftId: "draft-2", operationId: "op-2", generationStatus: "queued" });
+    apiService.getGenerationOperationStatus.mockResolvedValue(operation({ draftId: "draft-2", paymentStatus: "reserved", generationStatus: "queued" }));
+    await act(async () => { await result.current.startGeneration(form); });
+    expect(apiService.createGenerationPayment).toHaveBeenCalledTimes(1);
+    expect(apiService.startGenerationDraft).toHaveBeenCalledWith("draft-2");
+  });
+
+  it("ignores a balance response from the previous session", async () => {
+    let resolveBalance;
+    apiService.getGenerationBalance.mockImplementationOnce(() => new Promise(resolve => { resolveBalance = resolve; }));
+    const { result, rerender } = renderHook(() => useGenerationProcess());
+    await flush();
+    let pending;
+    await act(async () => { pending = result.current.refreshBalance(); });
+    authState = { status: "anonymous", sessionVersion: 1 };
+    rerender();
+    await act(async () => { resolveBalance({ availableGenerations: 5 }); await pending; });
+    expect(result.current.balance).toBeNull();
+    expect(result.current.isBalanceLoading).toBe(false);
+  });
+
+  it("keeps an explicit 404 after uncertain start without discovering another operation", async () => {
+    apiService.getGenerationBalance.mockResolvedValue({ availableGenerations: 1, canPurchase: false });
+    apiService.startGenerationDraft.mockRejectedValueOnce(new Error("lost start"));
+    apiService.getGenerationOperationStatus.mockRejectedValue(Object.assign(new Error("missing"), { status: 404 }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { await expect(result.current.startGeneration(form)).rejects.toThrow("lost start"); });
+    await act(async () => { await result.current.refreshStatus(); });
+    expect(result.current.statusError).toMatch(/не найдена/);
+    expect(apiService.getCurrentGenerationOperation).toHaveBeenCalledTimes(1);
+    expect(apiService.startGenerationDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps accepted generation visible when balance refresh fails", async () => {
+    apiService.getGenerationBalance.mockResolvedValueOnce({ availableGenerations: 1, canPurchase: false })
+      .mockRejectedValue(new Error("balance unavailable"));
+    apiService.getGenerationOperationStatus.mockResolvedValue(operation({ paymentStatus: "reserved", generationStatus: "running" }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { expect(await result.current.startGeneration(form)).toMatchObject({ draftId: "draft-1" }); });
+    expect(result.current.activeOperation.generationStatus).toBe("running");
+    expect(result.current.balanceError).toBe("balance unavailable");
+  });
+
+  it("refreshes terminal balance and creates a new draft only on explicit retry", async () => {
+    apiService.getGenerationBalance.mockResolvedValue({ availableGenerations: 1, canPurchase: false });
+    apiService.getGenerationOperationStatus.mockResolvedValue(operation({ paymentStatus: "generation_failed", generationStatus: "error" }));
+    const { result } = renderHook(() => useGenerationProcess());
+    await flush();
+    await act(async () => { await result.current.startGeneration(form); });
+    expect(result.current.canRetryGeneration).toBe(true);
+    expect(apiService.startGenerationDraft).toHaveBeenCalledTimes(1);
+    apiService.createGenerationDraft.mockResolvedValueOnce({ draftId: "draft-2" });
+    apiService.startGenerationDraft.mockResolvedValueOnce({ draftId: "draft-2", operationId: "op-2", generationStatus: "queued" });
+    apiService.getGenerationOperationStatus.mockResolvedValue(operation({ draftId: "draft-2", paymentStatus: "reserved", generationStatus: "queued" }));
+    await act(async () => { await result.current.retryFailedGeneration(); });
+    expect(apiService.startGenerationDraft.mock.calls).toEqual([["draft-1"], ["draft-2"]]);
+    expect(apiService.createGenerationDraft).toHaveBeenCalledTimes(2);
   });
 
   it("guards rapid duplicate submits while checkout preparation is pending", async () => {
@@ -645,7 +782,6 @@ describe("useGenerationProcess", () => {
     await flush();
     await act(async () => { await second.result.current.refreshStatus(); });
     expect(window.ym.mock.calls).toEqual([
-      [113444344, "reachGoal", "payment_success"],
       [113444344, "reachGoal", "generation_success"],
     ]);
     second.unmount();

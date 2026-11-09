@@ -22,6 +22,12 @@ export interface GenerationDraftCreation {
   draftId: string;
   expiresAt: string;
 }
+export interface GenerationStartResponse {
+  operationId: string;
+  draftId: string;
+  generationStatus: GenerationStatus;
+  storyId?: StoryId;
+}
 export interface PaymentCreation {
   purchaseId: string;
   providerPaymentId: string;
@@ -43,6 +49,8 @@ export type GenerationStatus =
   | "success"
   | "error";
 export interface GenerationOperationStatus {
+  operationId?: string;
+  fundingSource?: string;
   draftId: string;
   paymentStatus: PaymentStatus;
   generationStatus: GenerationStatus;
@@ -107,6 +115,8 @@ export interface BookViewerDto {
   scenes: BookViewerScene[];
 }
 export interface NormalizedOperation {
+  operationId?: string;
+  fundingSource?: string;
   draftId: string;
   paymentStatus: PaymentStatus;
   generationStatus: GenerationStatus;
@@ -132,6 +142,11 @@ export type GenerationFlowResponse = { status: "pending"; storyId: string };
 export type GenerationFlowStatusResponse = GenerationFlowState;
 export type GenerationPaymentStatusResponse = {
   paid: boolean;
+  availableGenerations: number;
+  reservedGenerations: number;
+  balanceVersion: number;
+  packageSize: number;
+  canPurchase: boolean;
   purchaseId?: string;
   paidAt?: string;
 };

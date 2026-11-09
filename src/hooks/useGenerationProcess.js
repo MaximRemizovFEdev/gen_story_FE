@@ -17,6 +17,8 @@ export const FLOW_STATUS = Object.freeze({
 export const PAYMENT_STATE = Object.freeze({
   IDLE: "idle",
   CHECKING: "checking",
+  SAVING: "saving",
+  STARTING: "starting",
   CREATING: "creating",
   WAITING: "waiting",
   GENERATING: "generating",
@@ -53,9 +55,13 @@ const FINISHED_PURCHASES = new Set([
   "consumed", "generation_failed", "canceled", "failed",
 ]);
 
-export const allowsNewGeneration = (operation) =>
-  operation === null || FINISHED_PURCHASES.has(operation?.paymentStatus) ||
-  (operation?.paymentStatus === "pending" && operation?.generationStatus === "not_started");
+export const allowsNewGeneration = (operation, balance) => {
+  const operationAllows = operation === null || FINISHED_PURCHASES.has(operation?.paymentStatus) ||
+    (operation?.paymentStatus === "pending" && operation?.generationStatus === "not_started");
+  if (!balance) return false;
+  return balance.availableGenerations > 0 ||
+    (balance.canPurchase && balance.reservedGenerations === 0 && operationAllows);
+};
 
 const getErrorMessage = (error) =>
   error?.message || "Не удалось запустить создание книги";
@@ -105,6 +111,12 @@ export const useGenerationProcess = () => {
   const [paymentState, setPaymentState] = useState(PAYMENT_STATE.IDLE);
   const [paymentConfirmationUrl, setPaymentConfirmationUrl] = useState("");
   const [acceptedDraftId, setAcceptedDraftId] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [balanceError, setBalanceError] = useState(null);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [retrySubmission, setRetrySubmission] = useState(null);
+  const balanceRequestRef = useRef(0);
+  const balanceRefreshKeyRef = useRef(null);
   const operationRef = useRef(null);
   const flowRef = useRef(null);
   const submittingRef = useRef(false);
@@ -127,8 +139,29 @@ export const useGenerationProcess = () => {
     return operationRequestRef.current;
   }, []);
 
+  const refreshBalance = useCallback(async (signal) => {
+    const requestId = ++balanceRequestRef.current;
+    const revision = revisionRef.current;
+    setIsBalanceLoading(true);
+    setBalanceError(null);
+    try {
+      const result = await apiService.getGenerationBalance(signal);
+      if (signal?.aborted || requestId !== balanceRequestRef.current || revision !== revisionRef.current) return null;
+      setBalance(result);
+      return result;
+    } catch (error) {
+      if (!signal?.aborted && requestId === balanceRequestRef.current && revision === revisionRef.current) {
+        setBalance(null);
+        if (error?.name !== "AbortError") setBalanceError(getErrorMessage(error));
+      }
+      throw error;
+    } finally {
+      if (requestId === balanceRequestRef.current) setIsBalanceLoading(false);
+    }
+  }, []);
+
   const setOperation = useCallback((operation) => {
-    if (["paid", "reserved", "consumed", "generation_failed"].includes(operation?.paymentStatus)) {
+    if (operation?.paymentStatus === "paid") {
       reachGoalOnce("payment_success", operation.draftId);
     }
     if (isReadyOperation(operation)) {
@@ -159,6 +192,12 @@ export const useGenerationProcess = () => {
 
   const clearSessionBoundState = useCallback(() => {
     revisionRef.current += 1;
+    balanceRequestRef.current += 1;
+    balanceRefreshKeyRef.current = null;
+    setBalance(null);
+    setBalanceError(null);
+    setIsBalanceLoading(false);
+    setRetrySubmission(null);
     invalidateTracking();
     attemptRef.current = null;
     setIsCheckingPermission(false);
@@ -268,9 +307,12 @@ export const useGenerationProcess = () => {
       setStatusError(null);
       try {
         const uncertainDraftId = attemptRef.current?.draftId;
-        const operation = uncertainDraftId
-          ? await apiService.getGenerationOperationStatus(uncertainDraftId, signal)
-          : await apiService.getCurrentGenerationOperation(signal);
+        const [operation] = await Promise.all([
+          uncertainDraftId
+            ? apiService.getGenerationOperationStatus(uncertainDraftId, signal)
+            : apiService.getCurrentGenerationOperation(signal),
+          refreshBalance(signal),
+        ]);
         if (
           signal?.aborted ||
           revision !== revisionRef.current ||
@@ -310,7 +352,7 @@ export const useGenerationProcess = () => {
         }
       }
     },
-    [clearSessionBoundState, invalidateTracking, isAuthenticated, setOperation],
+    [clearSessionBoundState, invalidateTracking, isAuthenticated, setOperation, refreshBalance],
   );
 
   useEffect(() => {
@@ -347,15 +389,14 @@ export const useGenerationProcess = () => {
     async (submission) => {
       if (
         submittingRef.current || permissionCheckRef.current !== null ||
-        isSubmitting || isRecovering || !isAuthenticated || statusError ||
-        !allowsNewGeneration(operationRef.current)
+        isSubmitting || isRecovering || !isAuthenticated || statusError
       ) return null;
 
+      const previousOperation = operationRef.current;
       const revision = revisionRef.current + 1;
       revisionRef.current = revision;
       invalidateTracking();
       attemptRef.current = { draftId: null };
-      setOperation(null);
       setAcceptedDraftId(null);
       setPaymentConfirmationUrl("");
       explicitRef.current = true;
@@ -365,7 +406,21 @@ export const useGenerationProcess = () => {
       setStatusError(null);
       setPaymentState(PAYMENT_STATE.CHECKING);
       let newDraftId = null;
+      let draftRequested = false;
+      let checkoutRequested = false;
       try {
+        const freshBalance = await refreshBalance();
+        if (revision !== revisionRef.current) return null;
+        if (!allowsNewGeneration(previousOperation, freshBalance)) {
+          attemptRef.current = null;
+          await recoverOperation(null, { explicit: false });
+          setSubmitError("Новая генерация пока недоступна. Проверьте текущую операцию и остаток.");
+          return null;
+        }
+        setOperation(null);
+        setRetrySubmission(submission);
+        setPaymentState(PAYMENT_STATE.SAVING);
+        draftRequested = true;
         const draft = await apiService.createGenerationDraft(
           submission.questionnaire,
           submission.childPhoto,
@@ -375,7 +430,27 @@ export const useGenerationProcess = () => {
         reachGoalOnce("wizard_complete", newDraftId);
         attemptRef.current = { draftId: newDraftId };
         setAcceptedDraftId(newDraftId);
+        if (freshBalance.availableGenerations > 0) {
+          setPaymentState(PAYMENT_STATE.STARTING);
+          const started = await apiService.startGenerationDraft(newDraftId);
+          if (revision !== revisionRef.current) return null;
+          // Start has no paymentStatus. Project its accepted result while status is read.
+          setOperation({
+            ...started,
+            paymentStatus: started.generationStatus === "success" ? "consumed" :
+              started.generationStatus === "error" ? "generation_failed" : "reserved",
+            storyId: started.storyId || null,
+            error: null,
+          });
+          setPaymentState(PAYMENT_STATE.GENERATING);
+          await Promise.allSettled([
+            refreshBalance(), recoverOperation(newDraftId, { explicit: true }),
+          ]);
+          if (revision !== revisionRef.current) return null;
+          return { draftId: newDraftId, operation: started };
+        }
         setPaymentState(PAYMENT_STATE.CREATING);
+        checkoutRequested = true;
         const payment = await apiService.createGenerationPayment(draft.draftId);
         if (revision !== revisionRef.current) return null;
         setPaymentConfirmationUrl(payment.confirmationUrl);
@@ -387,8 +462,17 @@ export const useGenerationProcess = () => {
         if (revision !== revisionRef.current) return null;
         if (error?.name !== "AbortError" && error?.status !== 401)
           setSubmitError(getErrorMessage(error));
-        if (newDraftId && error?.status !== 401) {
+        if (error?.status === 402 || error?.status === 409 || (checkoutRequested && error?.status === 503)) {
+          // Rejected writes did not accept this draft. Discover the winning tab read-only.
+          attemptRef.current = null;
+          await Promise.allSettled([refreshBalance(), recoverOperation(null, { explicit: false })]);
+        } else if (newDraftId && error?.status !== 401) {
           await recoverOperation(newDraftId, { explicit: true }).catch(() => null);
+        } else if (!newDraftId && error?.status !== 401) {
+          if (!draftRequested) {
+            attemptRef.current = null;
+            setOperation(previousOperation);
+          }
         }
         if (error?.status === 401) clearSessionBoundState();
         throw error;
@@ -408,6 +492,7 @@ export const useGenerationProcess = () => {
       isRecovering,
       isSubmitting,
       recoverOperation,
+      refreshBalance,
     ],
   );
 
@@ -421,6 +506,8 @@ export const useGenerationProcess = () => {
   );
 
   const retryGeneration = useCallback(() => refreshStatus(), [refreshStatus]);
+  const retryFailedGeneration = useCallback(() => retrySubmission ? submit(retrySubmission) : null,
+    [retrySubmission, submit]);
   const reopenPayment = useCallback(() => false, []);
   const checkPaymentStatus = useCallback(() => refreshStatus(), [refreshStatus]);
 
@@ -429,6 +516,23 @@ export const useGenerationProcess = () => {
     activeFlow?.status === FLOW_STATUS.ERROR ||
     (activeFlow?.stage === FLOW_STAGE.BOOK &&
       activeFlow?.status === FLOW_STATUS.SUCCESS);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const terminal = isReadyOperation(activeOperation) || isTerminalOperationError(activeOperation) || isTerminalFlow;
+    const key = terminal ? `${activeOperation?.draftId || storyId}:terminal` :
+      activeOperation && ["paid", "reserved", "consumed"].includes(activeOperation.paymentStatus)
+        ? `${activeOperation.draftId}:funded` : null;
+    if (!key || balanceRefreshKeyRef.current === key) return;
+    balanceRefreshKeyRef.current = key;
+    refreshBalance().catch(() => undefined);
+  }, [activeOperation, isAuthenticated, isTerminalFlow, storyId, refreshBalance]);
+
+  useEffect(() => {
+    if (isReadyOperation(activeOperation) ||
+      (activeFlow?.stage === FLOW_STAGE.BOOK && activeFlow?.status === FLOW_STATUS.SUCCESS)) {
+      setRetrySubmission(null);
+    }
+  }, [activeOperation, activeFlow]);
   const operationDraftId = activeOperation?.draftId;
   const trackingPaused = isSubmitting || isCheckingPermission || isRecovering;
   const shouldPollOperation =
@@ -582,6 +686,10 @@ export const useGenerationProcess = () => {
     () => ({
       activeFlow,
       activeOperation,
+      balance,
+      balanceError,
+      isBalanceLoading,
+      refreshBalance,
       operationUiState,
       isRecovering,
       isRecoveryPending:
@@ -593,6 +701,9 @@ export const useGenerationProcess = () => {
       hasTrackedFlow: Boolean(activeFlow || activeOperation),
       startGeneration,
       retryGeneration,
+      retryFailedGeneration,
+      canRetryGeneration: Boolean(retrySubmission) &&
+        (isTerminalOperationError(activeOperation) || activeFlow?.status === FLOW_STATUS.ERROR),
       refreshStatus,
       recoverOperation,
       checkNewSubmissionPermission,
@@ -608,6 +719,10 @@ export const useGenerationProcess = () => {
       acceptedDraftId,
       activeFlow,
       activeOperation,
+      balance,
+      balanceError,
+      isBalanceLoading,
+      refreshBalance,
       checkPaymentStatus,
       checkNewSubmissionPermission,
       clearCompletedFlow,
@@ -621,6 +736,8 @@ export const useGenerationProcess = () => {
       refreshStatus,
       reopenPayment,
       retryGeneration,
+      retryFailedGeneration,
+      retrySubmission,
       startGeneration,
       status,
       statusError,

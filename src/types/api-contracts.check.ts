@@ -4,6 +4,8 @@ import type {
   NormalizedOperation,
   StoryScenesResponse,
   UpdateStoryScenesRequest,
+  GenerationPaymentStatusResponse,
+  GenerationStartResponse,
 } from "./ApiService";
 
 const book: BookListItem = {
@@ -32,4 +34,12 @@ const response: StoryScenesResponse = {
   scenes: [{ sceneId: "1", text: null }],
 };
 
-export { book, scenes, result, operation, response };
+const balance: GenerationPaymentStatusResponse = {
+  paid: false, availableGenerations: 4, reservedGenerations: 0,
+  balanceVersion: 2, packageSize: 5, canPurchase: false,
+};
+const started: GenerationStartResponse = {
+  operationId: "operation", draftId: "draft", generationStatus: "queued",
+};
+
+export { book, scenes, result, operation, response, balance, started };

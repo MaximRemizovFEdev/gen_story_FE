@@ -3,6 +3,7 @@ import type {
   GenerationDraftCreation, GenerationFlowState, GenerationOperationStatus,
   NormalizedBookViewer, NormalizedOperation, PaymentCreation, StoryQuestionnaire,
   StoryScenesResponse, UpdateStoryScenesResponse,
+  GenerationPaymentStatusResponse, GenerationStartResponse,
 } from "../types/ApiService";
 
 type RequestConfig = { suppressUnauthorized?: boolean; responseType?: "blob" };
@@ -111,7 +112,7 @@ class ApiService {
               "Content-Type": "application/json",
             },
           },
-          "Не удалось сохранить анкету перед оплатой",
+          "Не удалось сохранить анкету",
         )
       : await this.request(
           "/generation-drafts",
@@ -120,10 +121,10 @@ class ApiService {
             body: this.createStoryFormData(questionnaire, childPhoto),
             headers: { Accept: "application/json" },
           },
-          "Не удалось сохранить анкету и фото перед оплатой",
+          "Не удалось сохранить анкету и фото",
         );
     if (!response?.draftId || typeof response.draftId !== "string") {
-      throw new Error("Сервер не вернул draftId для оплаты");
+      throw new Error("Сервер не вернул draftId анкеты");
     }
     return response;
   }
@@ -154,6 +155,30 @@ class ApiService {
     return payment;
   }
 
+  async getGenerationBalance(signal?: AbortSignal): Promise<GenerationPaymentStatusResponse> {
+    const balance = await this.request("/payments/generation/status", {
+      cache: "no-store", signal, headers: { Accept: "application/json" },
+    }, "Не удалось проверить остаток генераций");
+    if (!balance || typeof balance.paid !== "boolean" || typeof balance.canPurchase !== "boolean" ||
+      !["availableGenerations", "reservedGenerations", "balanceVersion", "packageSize"].every(
+        (key) => Number.isSafeInteger(balance[key]) && balance[key] >= (key === "packageSize" ? 1 : 0),
+      )) throw new Error("Сервер вернул некорректный баланс генераций");
+    return balance;
+  }
+
+  async startGenerationDraft(draftId: string): Promise<GenerationStartResponse> {
+    if (!draftId || typeof draftId !== "string") throw new Error("Не найден draftId для запуска");
+    const result = await this.request(`/generation-drafts/${encodeURIComponent(draftId)}/start`, {
+      method: "POST", headers: { Accept: "application/json" },
+    }, "Не удалось запустить создание сказки");
+    if (!result || result.draftId !== draftId || typeof result.operationId !== "string" || !result.operationId ||
+      !["queued", "running", "success", "error"].includes(result.generationStatus) ||
+      (result.storyId !== undefined && typeof result.storyId !== "string")) {
+      throw new Error("Сервер вернул некорректный ответ запуска");
+    }
+    return result;
+  }
+
   createStoryFormData(questionnaire: StoryQuestionnaire, childPhoto: File): FormData {
     const body = new FormData();
     body.append("formData", JSON.stringify(questionnaire));
@@ -173,6 +198,8 @@ class ApiService {
       throw new Error("Сервер вернул некорректный статус операции");
     }
     return {
+      ...(typeof operation.operationId === "string" ? { operationId: operation.operationId } : {}),
+      ...(typeof operation.fundingSource === "string" ? { fundingSource: operation.fundingSource } : {}),
       draftId: operation.draftId,
       paymentStatus: operation.paymentStatus,
       generationStatus: operation.generationStatus,
@@ -194,6 +221,7 @@ class ApiService {
     const operation = await this.request(
       `/generation-drafts/${encodeURIComponent(draftId)}/status`,
       {
+        cache: "no-store",
         headers: { Accept: "application/json" },
         signal,
       },
@@ -208,6 +236,7 @@ class ApiService {
     const response = await this.request(
       "/payments/generation/current",
       {
+        cache: "no-store",
         headers: { Accept: "application/json" },
         signal,
       },

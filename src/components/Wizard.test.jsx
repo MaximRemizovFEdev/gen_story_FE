@@ -12,16 +12,17 @@ vi.mock("../hooks/GenerationProcessContext", () => ({
   useGenerationProcessContext: vi.fn(),
 }));
 vi.mock("../hooks/useUserBooks", () => ({ useUserBooks: vi.fn() }));
-vi.mock("./steps/StepContent", () => ({
+vi.mock("./StepContent/StepContent", () => ({
   StepContent: () => <div>Последний шаг анкеты</div>,
 }));
-vi.mock("./books/UserBooks", () => ({ UserBooks: () => null }));
+vi.mock("./UserBooks/UserBooks", () => ({ UserBooks: () => null }));
 
 const form = { childName: "Миша", childPhoto: null };
 
 const generationState = (overrides = {}) => ({
   activeFlow: null,
   activeOperation: null,
+  balance: { availableGenerations: 0, reservedGenerations: 0, canPurchase: true },
   isSubmitting: false,
   isRecoveryPending: false,
   submitError: null,
@@ -179,9 +180,7 @@ describe("Wizard flow submission", () => {
     const { rerender } = render(<Wizard />);
 
     expect(checkNewSubmissionPermission).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /проверяем возможность создания/i,
-    );
+    expect(screen.getByText(/проверяем возможность создания/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /создать мою сказку/i })).toBeDisabled();
 
     await waitFor(() => expect(resolveFirst).toBeDefined());

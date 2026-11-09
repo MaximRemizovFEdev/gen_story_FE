@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { useWizardForm } from "../hooks/useWizardForm";
 import {
   allowsNewGeneration,
@@ -22,13 +23,16 @@ const PHOTO_PERMISSION_STATE = Object.freeze({
 
 const getSubmitButtonText = (paymentState, isSubmitting) => {
   if (!isSubmitting) return "Создать мою сказку";
-  if (paymentState === PAYMENT_STATE.CHECKING) return "Сохраняем анкету...";
+  if (paymentState === PAYMENT_STATE.CHECKING) return "Проверяем остаток...";
+  if (paymentState === PAYMENT_STATE.SAVING) return "Сохраняем анкету...";
+  if (paymentState === PAYMENT_STATE.STARTING) return "Запускаем сказку...";
   if (paymentState === PAYMENT_STATE.CREATING) return "Готовим оплату...";
   if (paymentState === PAYMENT_STATE.WAITING) return "Переходим к оплате...";
   return "Готовим создание...";
 };
 
 function Wizard({ booksPortalTarget }) {
+  const router = useRouter();
   const { isAuthenticated } = useAuth();
   const {
     step,
@@ -46,9 +50,15 @@ function Wizard({ booksPortalTarget }) {
     isRecoveryPending,
     submitError,
     activeOperation,
+    balance,
+    balanceError,
+    isBalanceLoading,
+    refreshBalance,
     paymentState,
     startGeneration,
     retryGeneration,
+    retryFailedGeneration,
+    canRetryGeneration,
     checkNewSubmissionPermission,
     clearCompletedFlow,
   } = useGenerationProcessContext();
@@ -70,12 +80,10 @@ function Wizard({ booksPortalTarget }) {
       photoCheckVisitRef.current = visitId;
       setPhotoPermissionState(PHOTO_PERMISSION_STATE.PENDING);
       try {
-        const operation = await checkNewSubmissionPermission({ signal });
+        await checkNewSubmissionPermission({ signal });
         if (signal?.aborted || visitId !== photoCheckVisitRef.current) return;
         setPhotoPermissionState(
-          allowsNewGeneration(operation)
-            ? PHOTO_PERMISSION_STATE.ALLOWED
-            : PHOTO_PERMISSION_STATE.BLOCKED,
+          PHOTO_PERMISSION_STATE.ALLOWED,
         );
       } catch (error) {
         if (error?.name === "AbortError") return;
@@ -133,12 +141,15 @@ function Wizard({ booksPortalTarget }) {
       !isStepValid() ||
       isSubmitting ||
       isRecoveryPending ||
-      !allowsNewGeneration(activeOperation)
+      !allowsNewGeneration(activeOperation, balance) || isBalanceLoading || balanceError
     )
       return;
     try {
       const response = await startGeneration(form);
-      if (response) reset();
+      if (response) {
+        reset();
+        if (response.operation) router.push(`/payment-return?draftId=${encodeURIComponent(response.draftId)}`);
+      }
     } catch {
       // Submission errors are exposed by the hook; the completed form stays intact.
     }
@@ -197,6 +208,15 @@ function Wizard({ booksPortalTarget }) {
             {submitError}
           </p>
         )}
+        {canRetryGeneration && (
+          <button type="button" className="button button--secondary"
+            disabled={isSubmitting || isRecoveryPending || isBalanceLoading}
+            onClick={() => Promise.resolve(retryFailedGeneration()).then(response => {
+              if (response?.operation) router.push(`/payment-return?draftId=${encodeURIComponent(response.draftId)}`);
+            }).catch(() => undefined)}>
+            Повторить создание
+          </button>
+        )}
         {isRecoveryPending && (
           <p className="generation-submit-error" role="status">
             Восстанавливаем текущую операцию...
@@ -206,6 +226,28 @@ function Wizard({ booksPortalTarget }) {
           <p className="generation-submit-status" role="status">
             Проверяем возможность создания…
           </p>
+        )}
+        {isPhotoStep && balance && (
+          <p className="generation-submit-status" role="status">
+            Доступно генераций: {balance.availableGenerations}.
+            {balance.reservedGenerations > 0 && ` В работе: ${balance.reservedGenerations}.`}
+          </p>
+        )}
+        {isPhotoStep && balance && balance.availableGenerations === 0 && balance.reservedGenerations > 0 && (
+          <p role="status">Дождитесь завершения текущей операции. Новая покупка пока недоступна.</p>
+        )}
+        {isPhotoStep && balance && balance.availableGenerations === 0 &&
+          balance.reservedGenerations === 0 && !balance.canPurchase && (
+          <p role="status">Покупка новых генераций сейчас недоступна.</p>
+        )}
+        {isPhotoStep && balanceError && !isPhotoPermissionError && (
+          <div role="alert">
+            <p>{balanceError}</p>
+            <button type="button" className="button button--secondary"
+              disabled={isBalanceLoading} onClick={() => refreshBalance().catch(() => undefined)}>
+              Обновить остаток
+            </button>
+          </div>
         )}
         {isPhotoPermissionError && (
           <div className="generation-submit-error" role="alert">
@@ -244,7 +286,7 @@ function Wizard({ booksPortalTarget }) {
               !isStepValid() ||
               isSubmitting ||
               isRecoveryPending ||
-              !allowsNewGeneration(activeOperation) ||
+              !allowsNewGeneration(activeOperation, balance) || isBalanceLoading || Boolean(balanceError) ||
               isPhotoPermissionBlocked
             }
           >
